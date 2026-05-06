@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Cozy Nest">
+<meta name="theme-color" content="#FFF8F3">
+<title>Cozy Nest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<!-- Supabase JS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="loading-screen" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--cream);z-index:300;font-size:48px">🏠</div>
+<div id="auth-screen" class="hidden"></div>
+
+<!-- COUPLE LINKING SCREEN -->
+<div id="couple-screen" class="hidden" style="position:fixed;inset:0;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;text-align:center;z-index:50;max-width:430px;margin:0 auto">
+  <div style="font-size:56px;margin-bottom:12px;animation:float 3s ease-in-out infinite">💌</div>
+  <div style="font-family:Lora,serif;font-size:24px;font-weight:600;color:var(--rose);margin-bottom:6px">Link with your partner</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:24px">Share your code or enter theirs</div>
+  <div style="background:white;border-radius:16px;padding:20px;width:100%;border:1px solid var(--bd);box-shadow:var(--sh);margin-bottom:12px">
+    <div class="ob-lbl">Your invite code</div>
+    <div id="my-invite-code" style="font-family:Lora,serif;font-size:26px;font-weight:600;letter-spacing:4px;color:var(--rose);background:var(--rose-l);border-radius:10px;padding:10px 18px;display:block;margin:6px 0 12px;text-align:center">NEST00</div>
+    <button class="btn-main" style="margin-bottom:8px" onclick="createCouple()">Create our nest →</button>
+    <div style="font-size:13px;color:var(--text3);margin:8px 0">— or enter your partner's code —</div>
+    <input class="ob-inp" id="join-code-inp" placeholder="e.g. NEST42" maxlength="8" style="text-align:center;font-family:Lora,serif;font-size:20px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px">
+    <button class="btn-main" style="background:var(--teal)" onclick="joinCouple()">Join their nest 💛</button>
+  </div>
+  <div style="font-size:12px;color:var(--text3);cursor:pointer" onclick="signOut()">Sign out</div>
+</div>
+
+<!-- MAIN APP SHELL -->
+<div id="app-shell" class="hidden">
+<div id="app">
+<div class="toast" id="toast"></div>
+<div class="topbar">
+  <div class="topbar-logo">Cozy Nest</div>
+  <div class="topbar-right">
+    <div class="streak-badge"><span>🔥</span><span id="sc">0 days</span></div>
+    <div class="coin-badge"><span>🪙</span><span id="cc">0</span></div>
+  </div>
+</div>
+<!-- HOME -->
+<div class="screen hidden" id="s-home">
+  <div class="banner"><div class="banner-day" id="bn-day">Day 1 together</div><div class="banner-h" id="bn-greet">Good morning ☀️</div></div>
+  <div class="pcards">
+    <div class="pcard"><div class="pcard-who">You</div><div class="pcard-av" id="hav-me" style="background:var(--rose-l)">🐻</div><div class="pcard-name" id="hn-me">You</div><div class="pcard-mood" id="hm-me">—</div><div class="pcard-note" id="hnote-me">No mood yet</div></div>
+    <div class="pcard"><div class="pcard-who">Partner</div><div class="pcard-av" id="hav-p" style="background:var(--teal-l)">🐱</div><div class="pcard-name" id="hn-p">Partner</div><div class="pcard-mood" id="hm-p">—</div><div class="pcard-note" id="hnote-p">Waiting...</div></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Today's activities <span style="float:right;font-size:10px;color:var(--text3);font-weight:400">Refreshed daily · earn 🪙</span></div>
+    <div id="act-list"></div>
+    <button class="add-act-btn" onclick="showModal('modal-act')">＋ Add a custom activity</button>
+  </div>
+  <div class="card"><div class="ctitle">💡 Daily nudge</div><div id="daily-tip" style="font-size:13px;color:var(--text2);line-height:1.6"></div></div>
+  <div style="padding:0 14px 4px;text-align:right"><span style="font-size:11px;color:var(--text3);cursor:pointer" onclick="signOut()">Sign out</span></div>
+</div>
+<!-- MOOD -->
+<div class="screen hidden" id="s-mood">
+  <div class="sec-hdr"><div class="sec-title">Mood</div><div class="sec-sub">How are you feeling right now?</div></div>
+  <div class="card">
+    <div class="ctitle">I'm feeling...</div>
+    <div class="mood-grid">
+      <div class="mood-opt" data-e="😄" data-l="Amazing" onclick="selMood(this)"><span>😄</span><span>Amazing</span></div>
+      <div class="mood-opt" data-e="😊" data-l="Happy" onclick="selMood(this)"><span>😊</span><span>Happy</span></div>
+      <div class="mood-opt" data-e="🥰" data-l="Loved" onclick="selMood(this)"><span>🥰</span><span>Loved</span></div>
+      <div class="mood-opt" data-e="😌" data-l="Peaceful" onclick="selMood(this)"><span>😌</span><span>Peaceful</span></div>
+      <div class="mood-opt" data-e="🤩" data-l="Excited" onclick="selMood(this)"><span>🤩</span><span>Excited</span></div>
+      <div class="mood-opt" data-e="😎" data-l="Confident" onclick="selMood(this)"><span>😎</span><span>Confident</span></div>
+      <div class="mood-opt" data-e="🥳" data-l="Celebratory" onclick="selMood(this)"><span>🥳</span><span>Celebratory</span></div>
+      <div class="mood-opt" data-e="😴" data-l="Tired" onclick="selMood(this)"><span>😴</span><span>Tired</span></div>
+      <div class="mood-opt" data-e="😐" data-l="Meh" onclick="selMood(this)"><span>😐</span><span>Meh</span></div>
+      <div class="mood-opt" data-e="🤔" data-l="Thoughtful" onclick="selMood(this)"><span>🤔</span><span>Thoughtful</span></div>
+      <div class="mood-opt" data-e="😰" data-l="Anxious" onclick="selMood(this)"><span>😰</span><span>Anxious</span></div>
+      <div class="mood-opt" data-e="😤" data-l="Stressed" onclick="selMood(this)"><span>😤</span><span>Stressed</span></div>
+      <div class="mood-opt" data-e="😔" data-l="Sad" onclick="selMood(this)"><span>😔</span><span>Sad</span></div>
+      <div class="mood-opt" data-e="😢" data-l="Emotional" onclick="selMood(this)"><span>😢</span><span>Emotional</span></div>
+      <div class="mood-opt" data-e="😡" data-l="Frustrated" onclick="selMood(this)"><span>😡</span><span>Frustrated</span></div>
+      <div class="mood-opt" data-e="🤒" data-l="Unwell" onclick="selMood(this)"><span>🤒</span><span>Unwell</span></div>
+    </div>
+    <textarea class="mood-note-area" id="mood-note" placeholder="Add a note... (optional)"></textarea>
+    <div id="mood-coin-note" style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px"></div>
+    <button class="btn-save" onclick="saveMood()">Share with partner 💌</button>
+  </div>
+  <div class="card">
+    <div class="ctitle">Partner's mood</div>
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0">
+      <span style="font-size:30px" id="pm-e">—</span>
+      <div><div style="font-size:14px;font-weight:600" id="pm-l">Waiting...</div><div style="font-size:11px;color:var(--text2);font-style:italic;margin-top:2px" id="pm-n"></div></div>
+    </div>
+    <div id="pm-sug" style="margin-top:8px;padding:10px 12px;background:var(--amber-l);border-radius:var(--rsm);font-size:12px;color:var(--brown);line-height:1.55"></div>
+  </div>
+  <div class="card"><div class="ctitle">This week</div><div id="mhist"></div></div>
+</div>
+<!-- NEST -->
+<div class="screen hidden" id="s-nest">
+  <div class="sec-hdr"><div class="sec-title">Our Nest</div><div class="sec-sub" id="nest-sub">Day 1 · 0 day streak</div></div>
+  <div class="room-art">
+    <svg viewBox="0 0 340 220" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:340px">
+      <rect x="0" y="155" width="340" height="65" fill="#F5EDE9" rx="3"/><rect x="0" y="0" width="340" height="158" fill="#FFF8F3"/>
+      <ellipse cx="170" cy="163" rx="98" ry="16" fill="#FDEEE9" stroke="#F5A48B" stroke-width="1.5"/>
+      <rect x="78" y="112" width="132" height="52" rx="14" fill="#E8A83A" opacity=".85"/>
+      <rect x="78" y="103" width="132" height="24" rx="10" fill="#BA7517" opacity=".7"/>
+      <rect x="78" y="108" width="19" height="58" rx="8" fill="#BA7517" opacity=".65"/>
+      <rect x="191" y="108" width="19" height="58" rx="8" fill="#BA7517" opacity=".65"/>
+      <ellipse cx="122" cy="116" rx="17" ry="9" fill="#FDEEE9" opacity=".9"/>
+      <ellipse cx="162" cy="116" rx="17" ry="9" fill="#EBF5F5" opacity=".9"/>
+      <rect x="218" y="28" width="82" height="72" rx="6" fill="#EBF5F5" stroke="#B8958A" stroke-width="1.5"/>
+      <line x1="259" y1="28" x2="259" y2="100" stroke="#B8958A" stroke-width="1.5"/>
+      <line x1="218" y1="64" x2="300" y2="64" stroke="#B8958A" stroke-width="1.5"/>
+      <circle cx="238" cy="48" r="11" fill="#EF9F27" opacity=".55"/>
+      <rect x="28" y="48" width="62" height="82" rx="4" fill="#8B6355" opacity=".65"/>
+      <rect x="28" y="48" width="62" height="8" rx="2" fill="#7A5C52"/>
+      <rect x="33" y="60" width="8" height="30" rx="2" fill="#E8735A" opacity=".9"/>
+      <rect x="43" y="60" width="8" height="25" rx="2" fill="#5BA4A4" opacity=".9"/>
+      <rect x="53" y="60" width="8" height="28" rx="2" fill="#E8A83A" opacity=".9"/>
+      <rect x="63" y="60" width="8" height="22" rx="2" fill="#7BA68A" opacity=".9"/>
+      <rect x="294" y="138" width="15" height="22" rx="3" fill="#8B6355" opacity=".65"/>
+      <circle cx="301" cy="128" r="17" fill="#7BA68A" opacity=".8"/>
+      <rect x="222" y="128" width="5" height="30" fill="#B8958A"/>
+      <polygon points="212,128 242,128 232,109 222,109" fill="#EF9F27" opacity=".8"/>
+      <text x="142" y="116" font-size="20" id="pet-in-room" text-anchor="middle">🐾</text>
+    </svg>
+  </div>
+  <div class="pet-section">
+    <div class="pet-h"><div class="pet-name">🐾 Pebble</div><div id="pet-fed-badge" style="font-size:10px;color:var(--sage);font-weight:700"></div></div>
+    <span class="pet-art-big" id="pet-art">🐣</span>
+    <div class="srow"><div class="slbl">Love</div><div class="sbar"><div class="sfill love" id="st-love" style="width:60%"></div></div><div style="font-size:10px;color:var(--text3);width:28px;text-align:right" id="st-love-n">60%</div></div>
+    <div class="srow"><div class="slbl">Happy</div><div class="sbar"><div class="sfill happy" id="st-happy" style="width:75%"></div></div><div style="font-size:10px;color:var(--text3);width:28px;text-align:right" id="st-happy-n">75%</div></div>
+    <div class="srow"><div class="slbl">Health</div><div class="sbar"><div class="sfill health" id="st-health" style="width:50%"></div></div><div style="font-size:10px;color:var(--text3);width:28px;text-align:right" id="st-health-n">50%</div></div>
+    <button class="btn-save" id="feed-btn" style="background:var(--sage)" onclick="feedPet()">Feed Pebble 🌿 · +3 🪙</button>
+    <div class="dlim" id="pet-lim">Once per day — make it count</div>
+  </div>
+  <div class="plant-section">
+    <div class="pet-h"><div class="pet-name">🌱 Sprout</div><div id="plant-watered-badge" style="font-size:10px;color:var(--teal);font-weight:700"></div></div>
+    <span class="pet-art-big" id="plant-art">🌱</span>
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:8px" id="plant-lbl">Seedling · 0% grown</div>
+    <div style="background:var(--bd);border-radius:4px;height:8px;overflow:hidden"><div id="plant-bar" style="height:100%;background:linear-gradient(90deg,var(--sage),var(--teal));border-radius:4px;transition:width .5s;width:20%"></div></div>
+    <button class="btn-save" id="water-btn" style="background:var(--teal)" onclick="waterPlant()">Water Sprout 💧 · +3 🪙</button>
+    <div class="dlim" id="plant-lim">Once per day — make it count</div>
+  </div>
+</div>
+<!-- CITY -->
+<div class="screen hidden" id="s-city" style="padding-bottom:0;display:flex;flex-direction:column">
+  <div class="sec-hdr" style="flex-shrink:0"><div class="sec-title">Our City</div><div class="sec-sub">Pan &amp; pinch to explore · tap to visit</div></div>
+  <div id="city-viewport" style="flex:1;min-height:0">
+    <div id="city-canvas"></div>
+    <div class="city-hint" id="city-hint">Pinch &amp; pan · tap buildings to enter</div>
+    <div class="city-zoom"><button onclick="zoomCity(1.25)">＋</button><button onclick="zoomCity(0.8)">－</button></div>
+  </div>
+</div>
+<!-- NOTES -->
+<div class="screen hidden" id="s-notes">
+  <div class="sec-hdr"><div class="sec-title">Love Notes</div><div class="sec-sub">Little messages, big feelings</div></div>
+  <div class="compose">
+    <div class="compose-row">
+      <textarea class="compose-inp" id="note-inp" placeholder="Send a little love..." rows="1" oninput="autoR(this)"></textarea>
+      <button class="compose-send" onclick="sendNote()">💌</button>
+    </div>
+    <div class="stickers">
+      <button class="stkr" onclick="sendStkr('❤️')">❤️</button><button class="stkr" onclick="sendStkr('🥰')">🥰</button>
+      <button class="stkr" onclick="sendStkr('✨')">✨</button><button class="stkr" onclick="sendStkr('🌙')">🌙</button>
+      <button class="stkr" onclick="sendStkr('☕')">☕</button><button class="stkr" onclick="sendStkr('🌸')">🌸</button>
+      <button class="stkr" onclick="sendStkr('🐾')">🐾</button><button class="stkr" onclick="sendStkr('🎉')">🎉</button>
+      <button class="stkr" onclick="sendStkr('🌈')">🌈</button><button class="stkr" onclick="sendStkr('💫')">💫</button>
+    </div>
+  </div>
+  <div class="notes-list" id="notes-list"></div>
+</div>
+<!-- DATES -->
+<div class="screen hidden" id="s-dates">
+  <div class="sec-hdr"><div class="sec-title">Special Dates</div><div class="sec-sub">Moments worth counting down to</div></div>
+  <div style="padding:0 14px;margin-bottom:10px"><button class="add-act-btn" onclick="showModal('modal-date')">＋ Add a special date</button></div>
+  <div id="dates-list" style="padding:0 14px;display:flex;flex-direction:column;gap:10px"></div>
+</div>
+<!-- TABBAR -->
+<div class="tabbar">
+  <button class="tab on" id="t-home" onclick="goTab('home')"><span class="ti">🏠</span><span class="tl">Home</span></button>
+  <button class="tab" id="t-mood" onclick="goTab('mood')"><span class="ti">😊</span><span class="tl">Mood</span></button>
+  <button class="tab" id="t-nest" onclick="goTab('nest')"><span class="ti">🐾</span><span class="tl">Nest</span></button>
+  <button class="tab" id="t-city" onclick="goTab('city')"><span class="ti">🏙️</span><span class="tl">City</span></button>
+  <button class="tab" id="t-notes" onclick="goTab('notes')"><span class="ti">💌</span><span class="tl">Notes</span></button>
+  <button class="tab" id="t-dates" onclick="goTab('dates')"><span class="ti">📅</span><span class="tl">Dates</span></button>
+</div>
+<!-- LOCATION OVERLAY -->
+<div id="loc-overlay">
+  <div class="loc-header">
+    <div><div class="loc-title" id="loc-title">Location</div><div style="font-size:11px;color:var(--text3);margin-top:2px" id="loc-subtitle"></div></div>
+    <button class="loc-close" onclick="closeLoc()">✕</button>
+  </div>
+  <div class="loc-body" id="loc-body"></div>
+</div>
+<!-- MODAL: ACTIVITY -->
+<div class="modal-ov hidden" id="modal-act" onclick="ovClose(event,'modal-act')">
+  <div class="modal-sh">
+    <div class="modal-handle"></div><div class="modal-title">Add custom activity</div>
+    <div class="modal-field"><div class="modal-lbl">Activity name</div><input class="modal-inp" id="act-name-inp" placeholder="e.g. Cook dinner together"></div>
+    <div class="modal-field"><div class="modal-lbl">Reward (1–50 🪙)</div><input class="modal-inp" id="act-coins-inp" type="number" min="1" max="50" value="10"></div>
+    <div class="modal-field"><div class="modal-lbl">Icon</div>
+      <div class="ob-emrow" style="flex-wrap:wrap;gap:6px">
+        <button class="ob-em on" data-e="🍳" onclick="pickIcon(this,'act')">🍳</button>
+        <button class="ob-em" data-e="🎲" onclick="pickIcon(this,'act')">🎲</button>
+        <button class="ob-em" data-e="🎬" onclick="pickIcon(this,'act')">🎬</button>
+        <button class="ob-em" data-e="🚶" onclick="pickIcon(this,'act')">🚶</button>
+        <button class="ob-em" data-e="📖" onclick="pickIcon(this,'act')">📖</button>
+        <button class="ob-em" data-e="🎵" onclick="pickIcon(this,'act')">🎵</button>
+        <button class="ob-em" data-e="🌙" onclick="pickIcon(this,'act')">🌙</button>
+        <button class="ob-em" data-e="☕" onclick="pickIcon(this,'act')">☕</button>
+      </div>
+    </div>
+    <div class="modal-row"><button class="btn-cancel" onclick="hideModal('modal-act')">Cancel</button><button class="btn-main" style="flex:2;margin-top:0" onclick="saveAct()">Add ✓</button></div>
+  </div>
+</div>
+<!-- MODAL: DATE -->
+<div class="modal-ov hidden" id="modal-date" onclick="ovClose(event,'modal-date')">
+  <div class="modal-sh">
+    <div class="modal-handle"></div><div class="modal-title">Add a special date ✨</div>
+    <div class="modal-field"><div class="modal-lbl">Name</div><input class="modal-inp" id="date-name-inp" placeholder="e.g. Our anniversary"></div>
+    <div class="modal-field"><div class="modal-lbl">Date</div><input class="modal-inp" id="date-date-inp" type="date"></div>
+    <div class="modal-field"><div class="modal-lbl">Icon</div>
+      <div class="ob-emrow">
+        <button class="ob-em on" data-e="💍" onclick="pickIcon(this,'date')">💍</button>
+        <button class="ob-em" data-e="🎂" onclick="pickIcon(this,'date')">🎂</button>
+        <button class="ob-em" data-e="✈️" onclick="pickIcon(this,'date')">✈️</button>
+        <button class="ob-em" data-e="🎉" onclick="pickIcon(this,'date')">🎉</button>
+        <button class="ob-em" data-e="❤️" onclick="pickIcon(this,'date')">❤️</button>
+      </div>
+    </div>
+    <div class="modal-row"><button class="btn-cancel" onclick="hideModal('modal-date')">Cancel</button><button class="btn-main" style="flex:2;margin-top:0" onclick="saveDate()">Save 💾</button></div>
+  </div>
+</div>
+</div><!-- /app -->
+</div><!-- /app-shell -->
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script src="city.js"></script>
+</body>
+</html>
