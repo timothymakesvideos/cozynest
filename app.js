@@ -133,9 +133,11 @@ async function joinCouple(){
   if(error||!couple){toast('Code not found');return;}
   if(couple.user2_id){toast('This couple is already full');return;}
   if(couple.user1_id===ME.id){toast("That's your own code!");return;}
-  await db.from('couples').update({user2_id:ME.id}).eq('id',couple.id);
-  await db.from('profiles').update({couple_id:couple.id}).eq('id',ME.id);
-  ME.couple_id=couple.id;COUPLE={...couple,user2_id:ME.id};
+  // Update couple first, then profile — order matters for RLS
+  const {error:e1}=await db.from('couples').update({user2_id:ME.id}).eq('id',couple.id);
+  if(e1){toast('Error joining: '+e1.message);return;}
+  const {error:e2}=await db.from('profiles').update({couple_id:couple.id}).eq('id',ME.id);
+  if(e2){toast('Error updating profile: '+e2.message);return;}
   toast('Joined! You\'re now linked 💛');
   await boot();
 }
@@ -192,6 +194,15 @@ function subscribeRT(){
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes',filter:`couple_id=eq.${COUPLE.id}`},p=>{
       if(p.new.user_id!==ME.id){NOTES.push(p.new);renderNotes();}
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'couples',filter:`id=eq.${COUPLE.id}`},async p=>{
+      // Partner just joined — load their profile
+      COUPLE=p.new;
+      const pid=COUPLE.user1_id===ME.id?COUPLE.user2_id:COUPLE.user1_id;
+      if(pid&&!PARTNER){
+        const {data:partner}=await db.from('profiles').select('*').eq('id',pid).single();
+        PARTNER=partner;renderHome();renderMood();renderSettings();toast((PARTNER?.name||'Partner')+' joined your nest! 💛');
+      }
     })
     .subscribe();
 }
@@ -296,26 +307,34 @@ function renderMood(){
 async function updPet(l,h,hl){await updateSS({pet_love:Math.min(100,(SS.pet_love||60)+l),pet_happy:Math.min(100,(SS.pet_happy||75)+h),pet_health:Math.min(100,(SS.pet_health||50)+hl)});}
 async function updPlant(v){await updateSS({plant_progress:Math.min(100,(SS.plant_progress||20)+v)});}
 async function feedPet(){
-  if(SS.pet_fed_date===TODAY()){toast('Pebble is full! Come back tomorrow 🌙');return;}
-  await updateSS({pet_fed_date:TODAY()});await updPet(10,12,8);await tryStreak();await earnCoins(3);toast('Pebble loved that! 🌟');renderNest();
+  const field=COUPLE.user1_id===ME.id?'pet_fed_user1':'pet_fed_user2';
+  if((SS[field]||'')===TODAY()){toast('You already fed Pebble today! Come back tomorrow 🌙');return;}
+  await updateSS({[field]:TODAY()});await updPet(10,12,8);await tryStreak();await earnCoins(3);toast('Pebble loved that! 🌟');renderNest();
 }
 async function waterPlant(){
-  if(SS.plant_watered_date===TODAY()){toast('Sprout is hydrated! Tomorrow 💧');return;}
-  await updateSS({plant_watered_date:TODAY()});await updPlant(10);await tryStreak();await earnCoins(3);toast('Sprout is growing! 🌱');renderNest();
+  const field=COUPLE.user1_id===ME.id?'plant_wat_user1':'plant_wat_user2';
+  if((SS[field]||'')===TODAY()){toast('You already watered Sprout today! Come back tomorrow 💧');return;}
+  await updateSS({[field]:TODAY()});await updPlant(10);await tryStreak();await earnCoins(3);toast('Sprout is growing! 🌱');renderNest();
 }
 function renderNest(){
   if(!SS)return;
-  const{pet_love:pl=60,pet_happy:ph=75,pet_health:phl=50,pet_fed_date:pfd='',plant_progress:pp=20,plant_watered_date:pwd=''}=SS;
+  const{pet_love:pl=60,pet_happy:ph=75,pet_health:phl=50,plant_progress:pp=20}=SS;
   ['love','happy','health'].forEach((k,i)=>{const v=[pl,ph,phl][i];g('st-'+k).style.width=v+'%';g('st-'+k+'-n').textContent=v+'%';});
   const ptl=Math.min(Math.floor((pl+ph+phl)/(300/PETS.length)),PETS.length-1);
   g('pet-art').textContent=PETS[ptl];g('pet-in-room').textContent=PETS[ptl];
-  const fed=pfd===TODAY();g('feed-btn').disabled=fed;g('feed-btn').style.opacity=fed?.5:1;
-  g('pet-fed-badge').textContent=fed?'Fed today ✓':'';g('pet-lim').textContent=fed?'Pebble is full — back tomorrow':'Once per day each partner';
+  const myFedField=COUPLE?.user1_id===ME?.id?'pet_fed_user1':'pet_fed_user2';
+  const myWatField=COUPLE?.user1_id===ME?.id?'plant_wat_user1':'plant_wat_user2';
+  const fed=(SS[myFedField]||'')===TODAY();
+  g('feed-btn').disabled=fed;g('feed-btn').style.opacity=fed?.5:1;
+  g('pet-fed-badge').textContent=fed?'You fed Pebble today ✓':'';
+  g('pet-lim').textContent=fed?'You already fed Pebble — partner can still feed':'Once per day each partner';
   const lvl=Math.min(Math.floor(pp/20),PLANTS.length-1);
   g('plant-art').textContent=PLANTS[lvl];g('plant-bar').style.width=pp+'%';
   g('plant-lbl').textContent=['Seedling','Sprout','Sapling','Young plant','Blooming','In full bloom'][lvl]+' · '+Math.round(pp)+'% grown';
-  const wat=pwd===TODAY();g('water-btn').disabled=wat;g('water-btn').style.opacity=wat?.5:1;
-  g('plant-watered-badge').textContent=wat?'Watered today 💧':'';g('plant-lim').textContent=wat?'Sprout is happy — back tomorrow':'Once per day each partner';
+  const wat=(SS[myWatField]||'')===TODAY();
+  g('water-btn').disabled=wat;g('water-btn').style.opacity=wat?.5:1;
+  g('plant-watered-badge').textContent=wat?'You watered Sprout today 💧':'';
+  g('plant-lim').textContent=wat?'You already watered Sprout — partner can still water':'Once per day each partner';
 }
 
 // CITY buy
