@@ -23,7 +23,7 @@ function buildCityMap(){
 }
 
 function makeCitySVG(){
-  const bldgs=HOTSPOTS.map(hs=>makeBldg(hs,BLDGS.find(b=>b.id===hs.id),S.city[hs.id]||hs.id==='nest')).join('');
+  const bldgs=HOTSPOTS.map(hs=>makeBldg(hs,BLDGS.find(b=>b.id===hs.id),((SS&&SS.city)||{nest:true})[hs.id]||hs.id==='nest')).join('');
   return`<svg width="${MAP_W}" height="${MAP_H}" viewBox="0 0 ${MAP_W} ${MAP_H}" xmlns="http://www.w3.org/2000/svg">
   <rect width="${MAP_W}" height="${MAP_H}" fill="#C8E8B0"/>
   <ellipse cx="400" cy="460" rx="280" ry="60" fill="#B5D99C" opacity=".4"/>
@@ -372,17 +372,21 @@ const ROOMS={
 
 function openLoc(id){
   const b=BLDGS.find(x=>x.id===id);if(!b)return;
-  const owned=S.city[id]||id==='nest';
+  const city=(SS&&SS.city)||{nest:true};
+  const owned=city[id]||id==='nest';
+  const coins=SS?.coins||0;
   document.getElementById('loc-title').textContent=b.name;
   document.getElementById('loc-subtitle').textContent=owned?'Tap activity to start':'Locked location';
   const body=document.getElementById('loc-body');
+  const myAv=ME?.avatar||'🐻', myName=ME?.name||'You';
+  const pAv=PARTNER?.avatar||'🐱', pName=PARTNER?.name||'Partner';
   if(owned){
     body.innerHTML=`
       <div style="background:linear-gradient(160deg,#FFF0E6,#E8F5F0)">${ROOMS[id]||''}</div>
       <div class="loc-avatars">
-        <div class="loc-avatar"><span class="loc-avatar-em">${S.myAvatar}</span><span class="loc-avatar-name">${S.myName}</span></div>
+        <div class="loc-avatar"><span class="loc-avatar-em">${myAv}</span><span class="loc-avatar-name">${myName}</span></div>
         <span style="font-size:20px;align-self:center">♥</span>
-        <div class="loc-avatar"><span class="loc-avatar-em">${S.pAvatar}</span><span class="loc-avatar-name">${S.pName}</span></div>
+        <div class="loc-avatar"><span class="loc-avatar-em">${pAv}</span><span class="loc-avatar-name">${pName}</span></div>
       </div>
       <div class="loc-activity-card">
         <div class="loc-act-label">✦ Activity at ${b.name}</div>
@@ -392,7 +396,7 @@ function openLoc(id){
         <button class="btn-save" onclick="toast('Have fun together! 🎉');closeLoc()">Start this activity 🎉</button>
       </div>`;
   } else {
-    const can=S.coins>=b.cost;
+    const can=coins>=b.cost;
     body.innerHTML=`
       <div style="filter:grayscale(1);opacity:.35;pointer-events:none">${ROOMS[id]||''}</div>
       <div class="loc-locked">
@@ -402,7 +406,7 @@ function openLoc(id){
         <div class="loc-locked-price">🪙 ${b.cost} Nest Coins</div><br>
         ${can
           ?`<button class="btn-save" onclick="buyLoc('${id}')">Unlock for 🪙 ${b.cost}</button>`
-          :`<button class="btn-save" style="background:var(--text3);cursor:not-allowed" disabled>Need ${b.cost-S.coins} more 🪙</button>
+          :`<button class="btn-save" style="background:var(--text3);cursor:not-allowed" disabled>Need ${b.cost-coins} more 🪙</button>
             <div style="font-size:11px;color:var(--text3);margin-top:8px">Complete activities &amp; share your mood daily</div>`}
       </div>`;
   }
@@ -410,9 +414,3 @@ function openLoc(id){
 }
 
 function closeLoc(){document.getElementById('loc-overlay').classList.remove('open');}
-
-function buyLoc(id){
-  const b=BLDGS.find(x=>x.id===id);if(!b||S.coins<b.cost)return;
-  S.coins-=b.cost;S.city[id]=true;save();
-  toast('🎉 '+b.name+' unlocked!');updateBar();buildCityMap();openLoc(id);
-}
