@@ -58,7 +58,6 @@
     <button class="add-act-btn" onclick="showModal('modal-act')">＋ Add a custom activity</button>
   </div>
   <div class="card"><div class="ctitle">💡 Daily nudge</div><div id="daily-tip" style="font-size:13px;color:var(--text2);line-height:1.6"></div></div>
-  <div style="padding:0 14px 4px;text-align:right"><span style="font-size:11px;color:var(--text3);cursor:pointer" onclick="signOut()">Sign out</span></div>
 </div>
 <!-- MOOD -->
 <div class="screen hidden" id="s-mood">
@@ -178,6 +177,44 @@
   <div style="padding:0 14px;margin-bottom:10px"><button class="add-act-btn" onclick="showModal('modal-date')">＋ Add a special date</button></div>
   <div id="dates-list" style="padding:0 14px;display:flex;flex-direction:column;gap:10px"></div>
 </div>
+<!-- SETTINGS -->
+<div class="screen hidden" id="s-settings">
+  <div class="sec-hdr"><div class="sec-title">Settings</div><div class="sec-sub">Your nest, your way</div></div>
+
+  <!-- Profile -->
+  <div class="card">
+    <div class="ctitle">Your profile</div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <div id="settings-avatar" style="font-size:36px;width:52px;height:52px;border-radius:50%;background:var(--rose-l);display:flex;align-items:center;justify-content:center">🐻</div>
+      <div><div id="settings-name" style="font-size:16px;font-weight:700"></div><div id="settings-email" style="font-size:12px;color:var(--text3);margin-top:2px"></div></div>
+    </div>
+    <div class="ob-lbl">Change your name</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input class="ob-inp" id="settings-name-inp" placeholder="Your name" maxlength="20" style="flex:1">
+      <button class="btn-save" style="width:auto;padding:11px 16px;margin-top:0" onclick="saveName()">Save</button>
+    </div>
+    <div class="ob-lbl">Change your avatar</div>
+    <div class="ob-emrow" id="settings-av-row">
+      <button class="ob-em" data-e="🐻" onclick="saveAvatar(this)">🐻</button>
+      <button class="ob-em" data-e="🐱" onclick="saveAvatar(this)">🐱</button>
+      <button class="ob-em" data-e="🐰" onclick="saveAvatar(this)">🐰</button>
+      <button class="ob-em" data-e="🦊" onclick="saveAvatar(this)">🦊</button>
+      <button class="ob-em" data-e="🐸" onclick="saveAvatar(this)">🐸</button>
+    </div>
+  </div>
+
+  <!-- Couple / Invite Code -->
+  <div class="card">
+    <div class="ctitle">Your nest</div>
+    <div id="settings-couple-block"></div>
+  </div>
+
+  <!-- Account -->
+  <div class="card">
+    <div class="ctitle">Account</div>
+    <button class="btn-save" style="background:var(--text2)" onclick="signOut()">Sign out</button>
+  </div>
+</div>
 <!-- TABBAR -->
 <div class="tabbar">
   <button class="tab on" id="t-home" onclick="goTab('home')"><span class="ti">🏠</span><span class="tl">Home</span></button>
@@ -186,6 +223,7 @@
   <button class="tab" id="t-city" onclick="goTab('city')"><span class="ti">🏙️</span><span class="tl">City</span></button>
   <button class="tab" id="t-notes" onclick="goTab('notes')"><span class="ti">💌</span><span class="tl">Notes</span></button>
   <button class="tab" id="t-dates" onclick="goTab('dates')"><span class="ti">📅</span><span class="tl">Dates</span></button>
+  <button class="tab" id="t-settings" onclick="goTab('settings')"><span class="ti">⚙️</span><span class="tl">Settings</span></button>
 </div>
 <!-- LOCATION OVERLAY -->
 <div id="loc-overlay">

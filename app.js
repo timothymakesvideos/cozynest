@@ -372,8 +372,8 @@ async function saveDate(){
 }
 
 // TABS
-const TABS=['home','mood','nest','city','notes','dates'];
-function goTab(t){TABS.forEach(x=>{g('s-'+x).classList.add('hidden');g('t-'+x).classList.remove('on');});g('s-'+t).classList.remove('hidden');g('t-'+t).classList.add('on');if(t==='notes')setTimeout(()=>{const s=g('s-notes');s.scrollTop=s.scrollHeight;},80);if(t==='city')buildCityMap();}
+const TABS=['home','mood','nest','city','notes','dates','settings'];
+function goTab(t){TABS.forEach(x=>{g('s-'+x).classList.add('hidden');g('t-'+x).classList.remove('on');});g('s-'+t).classList.remove('hidden');g('t-'+t).classList.add('on');if(t==='notes')setTimeout(()=>{const s=g('s-notes');s.scrollTop=s.scrollHeight;},80);if(t==='city')buildCityMap();if(t==='settings')renderSettings();}
 
 // MODALS
 function showModal(id){if(id==='modal-date')g('date-date-inp').value=TODAY();g(id).classList.remove('hidden');}
@@ -382,3 +382,95 @@ function ovClose(e,id){if(e.target.classList.contains('modal-ov'))hideModal(id);
 
 // BOOT
 db.auth.onAuthStateChange((event,session)=>{if(session){boot();}else{loading(false);showAuth('login');}});
+
+// ── SETTINGS ─────────────────────────────────────────────────
+function renderSettings(){
+  // Profile
+  g('settings-avatar').textContent = ME?.avatar||'🐻';
+  g('settings-name').textContent = ME?.name||'You';
+  g('settings-email').textContent = ME?.email||(db.auth.getUser().then(r=>r.data?.user?.email||''));
+  g('settings-name-inp').value = ME?.name||'';
+
+  // Highlight current avatar
+  g('settings-av-row').querySelectorAll('.ob-em').forEach(b=>{
+    b.classList.toggle('on', b.dataset.e === ME?.avatar);
+  });
+
+  // Couple block
+  const block = g('settings-couple-block');
+  if(!COUPLE){
+    block.innerHTML = `<div class="settings-no-partner">
+      <div class="settings-no-partner-icon">💌</div>
+      <div class="settings-no-partner-text">You haven't linked with a partner yet.<br>Share your invite code or enter theirs.</div>
+      <button class="btn-save" onclick="goTab('settings');showCouple()">Link with partner</button>
+    </div>`;
+    return;
+  }
+
+  // Has couple — show invite code + partner status
+  const code = COUPLE.invite_code||'—';
+  const hasPartner = !!(COUPLE.user1_id && COUPLE.user2_id);
+  block.innerHTML = `
+    <div class="ob-lbl">Your invite code</div>
+    <div class="settings-code" onclick="copyCode('${code}')" title="Tap to copy">${code}</div>
+    <div class="settings-copy-hint">Tap to copy · share with your partner</div>
+    ${hasPartner ? `
+    <div style="margin-top:14px">
+      <div class="ob-lbl">Partner</div>
+      <div class="settings-partner-row">
+        <div style="font-size:28px">${PARTNER?.avatar||'🐱'}</div>
+        <div>
+          <div style="font-size:14px;font-weight:600">${PARTNER?.name||'Partner'}</div>
+          <div style="font-size:11px;color:var(--sage);font-weight:600;margin-top:2px">✓ Linked</div>
+        </div>
+      </div>
+    </div>` : `
+    <div style="margin-top:12px;padding:10px 12px;background:var(--amber-l);border-radius:var(--rsm);font-size:13px;color:var(--brown);line-height:1.5">
+      ⏳ Waiting for your partner to join using your code above.
+    </div>
+    <div style="margin-top:10px">
+      <div class="ob-lbl">Or enter their code</div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input class="ob-inp" id="settings-join-inp" placeholder="e.g. NEST42" maxlength="8" style="flex:1;text-align:center;font-family:Lora,serif;font-size:18px;letter-spacing:3px;text-transform:uppercase">
+        <button class="btn-save" style="width:auto;padding:11px 16px;margin-top:0" onclick="settingsJoin()">Join</button>
+      </div>
+    </div>`}`;
+}
+
+function copyCode(code){
+  navigator.clipboard.writeText(code).then(()=>toast('Code copied! 📋')).catch(()=>toast('Your code: '+code));
+}
+
+async function saveName(){
+  const name = g('settings-name-inp').value.trim();
+  if(!name){toast('Enter a name');return;}
+  const {error} = await db.from('profiles').update({name}).eq('id', ME.id);
+  if(error){toast('Error saving');return;}
+  ME.name = name;
+  g('settings-name').textContent = name;
+  renderHome(); toast('Name updated ✓');
+}
+
+async function saveAvatar(btn){
+  const avatar = btn.dataset.e;
+  const {error} = await db.from('profiles').update({avatar}).eq('id', ME.id);
+  if(error){toast('Error saving');return;}
+  ME.avatar = avatar;
+  g('settings-avatar').textContent = avatar;
+  g('settings-av-row').querySelectorAll('.ob-em').forEach(b=>b.classList.toggle('on', b.dataset.e===avatar));
+  renderHome(); toast('Avatar updated ✓');
+}
+
+async function settingsJoin(){
+  const code = g('settings-join-inp').value.trim().toUpperCase();
+  if(!code){toast('Enter your partner\'s code');return;}
+  const {data:couple,error} = await db.from('couples').select('*').eq('invite_code',code).single();
+  if(error||!couple){toast('Code not found');return;}
+  if(couple.user2_id){toast('This couple is already full');return;}
+  if(couple.user1_id===ME.id){toast("That's your own code!");return;}
+  await db.from('couples').update({user2_id:ME.id}).eq('id',couple.id);
+  await db.from('profiles').update({couple_id:couple.id}).eq('id',ME.id);
+  ME.couple_id=couple.id; COUPLE={...couple,user2_id:ME.id};
+  toast('Linked with your partner! 💛');
+  await boot();
+}
