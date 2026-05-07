@@ -179,6 +179,7 @@ async function boot(){
     g('auth-screen').classList.add('hidden');
     g('app-shell').classList.remove('hidden');
     initUI();
+  registerPush();
   }catch(e){console.error(e);loading(false);toast('Error loading — please refresh');}
 }
 
@@ -271,6 +272,13 @@ async function saveAct(){
   CUSTOM_ACTS.push(data);hideModal('modal-act');g('act-name-inp').value='';renderHome();toast('Activity added! ✓');
 }
 
+async function deleteCustomAct(id){
+  if(!confirm('Delete this activity?'))return;
+  const{error}=await db.from('custom_activities').delete().eq('id',id).eq('couple_id',COUPLE.id);
+  if(error){toast('Error deleting');return;}
+  CUSTOM_ACTS=CUSTOM_ACTS.filter(a=>a.id!==id);renderHome();toast('Activity removed');
+}
+
 // MOOD — coins only once per day
 let moodE=null,moodL=null;
 function selMood(el_){
@@ -286,8 +294,8 @@ async function saveMood(){
   const {data:nm,error}=await db.from('moods').insert({couple_id:COUPLE.id,user_id:ME.id,emoji:moodE,label:moodL,note}).select().single();
   if(error){toast('Error: '+error.message);return;}
   MY_MOOD=nm;
-  if(!wasToday){await tryStreak();await earnCoins(5);toast('Mood shared! +5 🪙');}
-  else toast('Mood updated 💌');
+  if(!wasToday){await tryStreak();await earnCoins(5);toast('Mood shared! +5 🪙');sendPushNotification('mood',moodL+(nm.note?' · '+nm.note:''));}
+  else{toast('Mood updated 💌');sendPushNotification('mood',moodL+(nm.note?' · '+nm.note:''));}
   await updPlant(3);await updPet(3,0,2);
   g('mood-note').value='';moodE=null;moodL=null;
   document.querySelectorAll('.mood-opt').forEach(e=>e.classList.remove('on'));
@@ -348,9 +356,15 @@ async function buyLoc(id){
 function renderNotes(){
   g('notes-list').innerHTML=NOTES.map(n=>{
     const mine=n.user_id===ME.id;
-    if(n.sticker)return`<div class="nbub sticker ${mine?'me':'p'}">${n.sticker}</div>`;
+    if(n.sticker)return`<div class="nbub sticker ${mine?'me':'p'}" onclick="${mine?`deleteNote('${n.id}')`:''}">${n.sticker}</div>`;
     const t=new Date(n.created_at).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
-    return`<div class="nbub ${mine?'me':'p'}"><div class="nt">${n.text}</div><div class="ntm">${t}</div></div>`;
+    return`<div class="nbub ${mine?'me':'p'}">
+      <div class="nt">${n.text}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">
+        <div class="ntm">${t}</div>
+        ${mine?`<div class="ntm" style="cursor:pointer;opacity:.5" onclick="deleteNote('${n.id}')">✕</div>`:''}
+      </div>
+    </div>`;
   }).join('');
   setTimeout(()=>{const s=g('s-notes');if(s)s.scrollTop=s.scrollHeight;},60);
 }
@@ -360,11 +374,19 @@ async function sendNote(){
   const {data:note,error}=await db.from('notes').insert({couple_id:COUPLE.id,user_id:ME.id,text:txt,sticker:''}).select().single();
   if(error){toast('Error sending');return;}
   NOTES.push(note);renderNotes();await earnCoins(2);
+  sendPushNotification('note', txt.substring(0,80));
 }
 async function sendStkr(s){
   const {data:note}=await db.from('notes').insert({couple_id:COUPLE.id,user_id:ME.id,text:'',sticker:s}).select().single();
   if(note){NOTES.push(note);renderNotes();}
 }
+async function deleteNote(id){
+  if(!confirm('Delete this note?'))return;
+  const{error}=await db.from('notes').delete().eq('id',id).eq('user_id',ME.id);
+  if(error){toast('Error deleting');return;}
+  NOTES=NOTES.filter(n=>n.id!==id);renderNotes();
+}
+
 function autoR(el_){el_.style.height='';el_.style.height=Math.min(el_.scrollHeight,110)+'px';}
 
 // DATES
@@ -377,7 +399,10 @@ function renderDates(){
     const diff=Math.ceil((next-today)/86400000);
     return`<div class="date-card"><div style="font-size:26px;flex-shrink:0">${d.icon}</div>
       <div style="flex:1"><div class="date-name">${d.name}</div><div class="date-when">${dt.toLocaleDateString('en',{month:'long',day:'numeric'})}</div></div>
-      <div><div class="date-days">${diff===0?'🎉':diff}</div><div class="date-dlbl">${diff===0?'today!':'days'}</div></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div><div class="date-days">${diff===0?'🎉':diff}</div><div class="date-dlbl">${diff===0?'today!':'days'}</div></div>
+        <div style="font-size:16px;cursor:pointer;opacity:.4;padding:4px" onclick="deleteDate('${d.id}')">🗑️</div>
+      </div>
     </div>`;
   }).join('');
 }
@@ -388,6 +413,13 @@ async function saveDate(){
   if(error){toast('Error: '+error.message);return;}
   DATES.push(data);DATES.sort((a,b)=>a.date.localeCompare(b.date));
   renderDates();hideModal('modal-date');toast('Date added! 🎉');g('date-name-inp').value='';
+}
+
+async function deleteDate(id){
+  if(!confirm('Delete this date?'))return;
+  const{error}=await db.from('special_dates').delete().eq('id',id).eq('couple_id',COUPLE.id);
+  if(error){toast('Error deleting');return;}
+  DATES=DATES.filter(d=>d.id!==id);renderDates();toast('Date removed');
 }
 
 // TABS
@@ -401,6 +433,49 @@ function ovClose(e,id){if(e.target.classList.contains('modal-ov'))hideModal(id);
 
 // BOOT
 db.auth.onAuthStateChange((event,session)=>{if(session){boot();}else{loading(false);showAuth('login');}});
+
+// ── SERVICE WORKER + PUSH REGISTRATION ───────────────────────
+async function registerPush(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  try{
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    // Ask permission
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted') return;
+    // Get VAPID public key from config
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    // Save subscription to Supabase
+    await db.from('push_subscriptions').upsert({
+      user_id: ME.id,
+      couple_id: COUPLE.id,
+      endpoint: sub.endpoint,
+      subscription: sub.toJSON()
+    }, {onConflict: 'endpoint'});
+    console.log('Push registered');
+  } catch(e){ console.warn('Push registration failed:', e); }
+}
+
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64);
+  return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
+}
+
+async function sendPushNotification(type, content){
+  if(!COUPLE||!ME) return;
+  try{
+    await fetch(`${SUPABASE_URL}/functions/v1/push-notify`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON},
+      body: JSON.stringify({type, couple_id:COUPLE.id, sender_id:ME.id, sender_name:ME.name||'Partner', content})
+    });
+  } catch(e){ console.warn('Push send failed:', e); }
+}
 
 // ── SETTINGS ─────────────────────────────────────────────────
 function renderSettings(){
