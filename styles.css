@@ -210,3 +210,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 .auth-title{font-family:'Lora',serif;font-size:28px;font-weight:600;color:var(--rose);margin-bottom:4px}
 .auth-sub{font-size:14px;color:var(--text2);margin-bottom:24px}
 .auth-card{background:white;border-radius:var(--r);padding:20px;width:100%;border:1px solid var(--bd);box-shadow:var(--sh);text-align:left}
+
+/* ── ACTIVITY DELETE BUTTON ── */
+.act-del{font-size:13px;color:var(--text3);cursor:pointer;padding:4px 6px;border-radius:6px;line-height:1;transition:all .2s;flex-shrink:0}
+.act-del:hover{background:var(--rose-l);color:var(--rose)}

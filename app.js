@@ -237,14 +237,20 @@ function renderHome(){
   g('hav-p').textContent=PARTNER?.avatar||'🐱';g('hn-p').textContent=PARTNER?.name||'Partner';
   g('hm-me').textContent=MY_MOOD?.emoji||'—';g('hnote-me').textContent=MY_MOOD?.note||MY_MOOD?.label||'No mood yet';
   g('hm-p').textContent=P_MOOD?.emoji||'—';g('hnote-p').textContent=P_MOOD?.note||P_MOOD?.label||(PARTNER?'No mood yet':'Waiting for partner...');
-  const pool=pickPool(TODAY());
-  const all=[...pool,...CUSTOM_ACTS.map(a=>({...a,color:'var(--brown-l)'}))];
+  const pool=pickPool(TODAY()).map(a=>({...a,isCustom:false}));
+  const custom=CUSTOM_ACTS.map(a=>({...a,color:'var(--brown-l)',isCustom:true}));
+  const all=[...pool,...custom];
   g('act-list').innerHTML=all.map(a=>{
     const done=ACT_DONE_TODAY.includes(a.id);
+    const chkClick=done?`unDoAct('${a.id}')`:`doAct('${a.id}',${a.coins})`;
+    const delBtn=a.isCustom?`<span class="act-del" onclick="deleteCustomAct('${a.id}')">✕</span>`:'';
     return`<div class="act-item">
       <div class="act-icon" style="background:${a.color||'var(--teal-l)'}">${a.icon}</div>
       <div class="act-info"><div class="act-name">${a.name}</div><div class="act-desc">${a.desc||''}</div><div class="act-reward">+${a.coins} 🪙</div></div>
-      <div class="act-chk ${done?'done':''}" onclick="${done?'':'doAct(\''+a.id+'\','+a.coins+')'}">✓</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="act-chk ${done?'done':''}" onclick="${chkClick}">✓</div>
+        ${delBtn}
+      </div>
     </div>`;
   }).join('');
   g('daily-tip').textContent=TIPS[new Date().getDay()%TIPS.length];
@@ -282,10 +288,12 @@ async function saveAct(){
 }
 
 async function deleteCustomAct(id){
-  if(!confirm('Delete this activity?'))return;
+  if(!confirm('Remove this activity?'))return;
   const{error}=await db.from('custom_activities').delete().eq('id',id).eq('couple_id',COUPLE.id);
-  if(error){toast('Error deleting');return;}
-  CUSTOM_ACTS=CUSTOM_ACTS.filter(a=>a.id!==id);renderHome();toast('Activity removed');
+  if(error){toast('Error: '+error.message);return;}
+  CUSTOM_ACTS=CUSTOM_ACTS.filter(a=>a.id!==id);
+  ACT_DONE_TODAY=ACT_DONE_TODAY.filter(x=>x!==id);
+  renderHome();toast('Activity removed');
 }
 
 // MOOD — coins only once per day
@@ -487,13 +495,27 @@ function urlBase64ToUint8Array(base64String){
 async function sendPushNotification(type, content){
   if(!COUPLE||!ME) return;
   try{
+    // Use the current user session token for auth
+    const{data:{session}}=await db.auth.getSession();
+    const token=session?.access_token||SUPABASE_ANON;
     const res=await fetch(`${SUPABASE_URL}/functions/v1/push-notify`, {
       method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON},
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
       body: JSON.stringify({type, couple_id:COUPLE.id, sender_id:ME.id, sender_name:ME.name||'Partner', content})
     });
-    if(!res.ok) console.warn('Push notify failed:',res.status, await res.text());
+    if(!res.ok){
+      const txt=await res.text();
+      console.warn('Push notify failed:',res.status, txt);
+    } else {
+      console.log('Push sent:', await res.text());
+    }
   } catch(e){ console.warn('Push send failed:', e.message||e); }
+}
+
+// Call this from browser console to test: testPush()
+async function testPush(){
+  console.log('Testing push...');
+  await sendPushNotification('note','Test notification from Cozy Nest!');
 }
 
 // ── SETTINGS ─────────────────────────────────────────────────
