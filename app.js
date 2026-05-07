@@ -261,6 +261,15 @@ async function doAct(id,coins){
   renderHome();updateBar();
 }
 
+async function unDoAct(id){
+  // Remove from DB
+  const{error}=await db.from('activities').delete()
+    .eq('couple_id',COUPLE.id).eq('user_id',ME.id).eq('act_id',id).eq('act_date',TODAY());
+  if(error){toast('Error unchecking');return;}
+  ACT_DONE_TODAY=ACT_DONE_TODAY.filter(x=>x!==id);
+  renderHome();toast('Activity unchecked');
+}
+
 // CUSTOM ACT
 let actIcon='🍳',dateIcon='💍';
 function pickIcon(btn,type){btn.closest('.modal-sh').querySelectorAll('.ob-em').forEach(b=>b.classList.remove('on'));btn.classList.add('on');if(type==='act')actIcon=btn.dataset.e;else dateIcon=btn.dataset.e;}
@@ -436,27 +445,36 @@ db.auth.onAuthStateChange((event,session)=>{if(session){boot();}else{loading(fal
 
 // ── SERVICE WORKER + PUSH REGISTRATION ───────────────────────
 async function registerPush(){
-  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+    console.warn('Push not supported in this browser');return;
+  }
+  if(!VAPID_PUBLIC_KEY||VAPID_PUBLIC_KEY==='YOUR_VAPID_PUBLIC_KEY'){
+    console.warn('VAPID key not set in config.js');return;
+  }
   try{
-    const reg = await navigator.serviceWorker.register('/sw.js');
+    // Register SW — must be at root for full scope
+    const reg = await navigator.serviceWorker.register('/sw.js',{scope:'/'});
     await navigator.serviceWorker.ready;
-    // Ask permission
-    const perm = await Notification.requestPermission();
-    if(perm !== 'granted') return;
-    // Get VAPID public key from config
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-    // Save subscription to Supabase
-    await db.from('push_subscriptions').upsert({
+    // Check existing subscription first
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      const perm = await Notification.requestPermission();
+      if(perm !== 'granted'){console.warn('Push permission denied');return;}
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    // Upsert subscription
+    const{error}=await db.from('push_subscriptions').upsert({
       user_id: ME.id,
       couple_id: COUPLE.id,
       endpoint: sub.endpoint,
       subscription: sub.toJSON()
-    }, {onConflict: 'endpoint'});
-    console.log('Push registered');
-  } catch(e){ console.warn('Push registration failed:', e); }
+    },{onConflict:'endpoint'});
+    if(error) console.warn('Push sub save failed:',error.message);
+    else console.log('Push registered successfully');
+  } catch(e){ console.warn('Push registration failed:',e.message||e); }
 }
 
 function urlBase64ToUint8Array(base64String){
@@ -469,12 +487,13 @@ function urlBase64ToUint8Array(base64String){
 async function sendPushNotification(type, content){
   if(!COUPLE||!ME) return;
   try{
-    await fetch(`${SUPABASE_URL}/functions/v1/push-notify`, {
+    const res=await fetch(`${SUPABASE_URL}/functions/v1/push-notify`, {
       method: 'POST',
       headers: {'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON},
       body: JSON.stringify({type, couple_id:COUPLE.id, sender_id:ME.id, sender_name:ME.name||'Partner', content})
     });
-  } catch(e){ console.warn('Push send failed:', e); }
+    if(!res.ok) console.warn('Push notify failed:',res.status, await res.text());
+  } catch(e){ console.warn('Push send failed:', e.message||e); }
 }
 
 // ── SETTINGS ─────────────────────────────────────────────────
