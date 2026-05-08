@@ -296,3 +296,8 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
   .tab .tl{display:none}
   .tab{padding:8px 6px}
 }
+
+/* ── STICKER TOGGLE BUTTON ── */
+.stkr-toggle{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--bd2);background:var(--cream);font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.stkr-toggle:active{transform:scale(.9)}
+.stickers{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap;overflow:hidden;transition:all .2s}

@@ -63,7 +63,7 @@ function makeBldg(hs,b,owned){
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="rgba(30,10,0,.38)"/>
      <text x="${cx}" y="${y+h/2-8}" font-size="24" text-anchor="middle">🔒</text>
      <text x="${cx}" y="${y+h/2+14}" font-size="11" font-weight="bold" fill="white" text-anchor="middle">${b.cost} 🪙</text>`;
-  return`<g id="bld-${id}" style="cursor:pointer" onclick="tapBldg('${id}')">
+  return`<g id="bld-${id}" style="cursor:pointer">
     ${bldgFacade(id,x,y,w,h,owned,op)}
     ${locked}
     <rect x="${x}" y="${y+h-28}" width="${w}" height="28" rx="10" fill="rgba(255,248,243,.9)"/>
@@ -176,7 +176,20 @@ function setupCityEvents(){
     }
     e.preventDefault();
   },{passive:false});
-  vp.addEventListener('touchend',()=>setTimeout(()=>{isDrag=false;},60),{passive:true});
+  vp.addEventListener('touchend',e=>{
+    if(!isDrag&&t0&&e.changedTouches.length===1){
+      // It was a tap — find which building was hit
+      const touch=e.changedTouches[0];
+      const vr=vp.getBoundingClientRect();
+      // Convert screen coords to SVG canvas coords
+      const svgX=(touch.clientX-vr.left-camX)/camZ;
+      const svgY=(touch.clientY-vr.top-camY)/camZ;
+      const hit=HOTSPOTS.find(h=>svgX>=h.x&&svgX<=h.x+h.w&&svgY>=h.y&&svgY<=h.y+h.h);
+      if(hit) openLoc(hit.id);
+    }
+    isDrag=false;
+    t0=null;
+  },{passive:true});
 
   let lx=0,ly=0,mouseDown=false;
   vp.addEventListener('mousedown',e=>{mouseDown=true;isDrag=false;lx=e.clientX;ly=e.clientY;vp.classList.add('grabbing');});
@@ -186,7 +199,16 @@ function setupCityEvents(){
     if(Math.abs(dx)>3||Math.abs(dy)>3)isDrag=true;
     camX+=dx;camY+=dy;lx=e.clientX;ly=e.clientY;clampCam();applyCam();
   });
-  document.addEventListener('mouseup',()=>{mouseDown=false;vp.classList.remove('grabbing');setTimeout(()=>{isDrag=false;},60);});
+  document.addEventListener('mouseup',e=>{
+    if(!isDrag&&mouseDown){
+      const vr=vp.getBoundingClientRect();
+      const svgX=(e.clientX-vr.left-camX)/camZ;
+      const svgY=(e.clientY-vr.top-camY)/camZ;
+      const hit=HOTSPOTS.find(h=>svgX>=h.x&&svgX<=h.x+h.w&&svgY>=h.y&&svgY<=h.y+h.h);
+      if(hit) openLoc(hit.id);
+    }
+    mouseDown=false;vp.classList.remove('grabbing');isDrag=false;
+  });
   vp.addEventListener('wheel',e=>{
     const r=vp.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
     const nz=Math.min(2,Math.max(0.3,camZ*(e.deltaY>0?.9:1.1)));
@@ -194,7 +216,10 @@ function setupCityEvents(){
   },{passive:false});
 }
 
-function tapBldg(id){if(isDrag)return;openLoc(id);}
+function tapBldg(id){
+  // isDrag check handled by touch events directly — just open
+  openLoc(id);
+}
 
 // ── LOCATION ROOMS ────────────────────────────────────────
 const ROOMS={

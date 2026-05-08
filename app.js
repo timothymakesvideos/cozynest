@@ -417,6 +417,14 @@ async function deleteNote(id){
 
 function autoR(el_){el_.style.height='';el_.style.height=Math.min(el_.scrollHeight,110)+'px';}
 
+function toggleStickers(){
+  const row=g('stickers-row');
+  const btn=g('stkr-toggle-btn');
+  const hidden=row.classList.toggle('hidden');
+  btn.textContent=hidden?'😊':'✕';
+  if(!hidden) setTimeout(()=>{const s=g('notes-scroll');if(s)s.scrollTop=s.scrollHeight;},50);
+}
+
 // DATES
 function renderDates(){
   const today=new Date();today.setHours(0,0,0,0);

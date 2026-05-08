@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-title" content="Cozy Nest">
 <meta name="theme-color" content="#FFF8F3">
 <title>Cozy Nest</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23E8735A'/><text y='.9em' font-size='72' x='12'>🏠</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23E8735A'/><text y='.9em' font-size='72' x='12'>🏠</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
@@ -161,10 +163,11 @@
   </div>
   <div class="compose">
     <div class="compose-row">
+      <button class="stkr-toggle" onclick="toggleStickers()" id="stkr-toggle-btn" title="Emoji">😊</button>
       <textarea class="compose-inp" id="note-inp" placeholder="Send a little love..." rows="1" oninput="autoR(this)"></textarea>
       <button class="compose-send" onclick="sendNote()">💌</button>
     </div>
-    <div class="stickers">
+    <div class="stickers hidden" id="stickers-row">
       <button class="stkr" onclick="sendStkr('❤️')">❤️</button><button class="stkr" onclick="sendStkr('🥰')">🥰</button>
       <button class="stkr" onclick="sendStkr('✨')">✨</button><button class="stkr" onclick="sendStkr('🌙')">🌙</button>
       <button class="stkr" onclick="sendStkr('☕')">☕</button><button class="stkr" onclick="sendStkr('🌸')">🌸</button>
