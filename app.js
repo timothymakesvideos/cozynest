@@ -221,7 +221,18 @@ async function tryStreak(){
 async function earnCoins(n){await updateSS({coins:(SS.coins||0)+n});updateBar();coinPop(n);}
 
 // ── UI ───────────────────────────────────────────────────────
-function initUI(){updateBar();updateGreeting();renderHome();renderMood();renderNest();renderNotes();renderDates();renderNestActivity();goTab('home');}
+async function initUI(){
+  updateBar();
+  updateGreeting();
+  renderHome();
+  renderNest();
+  renderNotes();
+  renderDates();
+  renderNestActivity();
+  goTab('home');
+  // Load async data after UI is visible
+  try{ await renderMood(); } catch(e){ console.warn('renderMood error:',e); }
+}
 function updateBar(){g('sc').textContent=(SS?.streak||0)===1?'1 day':(SS?.streak||0)+' days';g('cc').textContent=SS?.coins||0;}
 function updateGreeting(){
   const h=new Date().getHours();
@@ -320,6 +331,7 @@ async function saveMood(){
   renderMood();renderHome();updateBar();
 }
 async function renderMood(){
+  if(!COUPLE) return;
   g('pm-e').textContent=P_MOOD?.emoji||'—';
   g('pm-l').textContent=P_MOOD?.label||(PARTNER?'No mood yet':'Waiting for partner...');
   g('pm-n').textContent=P_MOOD?.note?'"'+P_MOOD.note+'"':'';
@@ -581,6 +593,7 @@ async function testPush(){
 
 // ── SETTINGS ─────────────────────────────────────────────────
 function renderSettings(){
+  if(!ME) return;
   // Profile
   g('settings-avatar').textContent = ME?.avatar||'🐻';
   g('settings-name').textContent = ME?.name||'You';
@@ -671,6 +684,7 @@ const NEST_ACTIVITIES=[
 ];
 
 function renderNestActivity(){
+  if(!ME||!COUPLE) return;
   const card=g('nest-activity-card');
   if(!card)return;
   const idx=Math.floor(Date.now()/86400000)%NEST_ACTIVITIES.length;
@@ -688,6 +702,7 @@ function renderNestActivity(){
 
 // ── NOTIFICATION SETTINGS ─────────────────────────────────
 async function updateNotifStatus(){
+  if(!ME||!COUPLE) return;
   const statusEl=g('notif-status');
   const toggleEl=g('notif-toggle');
   if(!statusEl||!toggleEl)return;
