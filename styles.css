@@ -13,6 +13,11 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 #app{height:100dvh;display:flex;flex-direction:column;max-width:430px;margin:0 auto;background:var(--cream);overflow:hidden;position:relative}
 .screen{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:calc(var(--tab)+16px);-webkit-overflow-scrolling:touch}
 .screen::-webkit-scrollbar{display:none}
+/* Notes screen overrides — compose pinned to bottom */
+#s-notes{display:flex;flex-direction:column;padding-bottom:0}
+#s-notes .compose{flex-shrink:0;margin-bottom:0;border-radius:0;border-left:none;border-right:none;border-bottom:none;padding-bottom:calc(13px + env(safe-area-inset-bottom,0px))}
+#notes-scroll{flex:1;overflow-y:auto;padding:10px 14px calc(var(--tab)+8px);display:flex;flex-direction:column;gap:8px}
+#notes-scroll::-webkit-scrollbar{display:none}
 
 /* ONBOARDING */
 #ob{position:fixed;inset:0;z-index:100;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;text-align:center;max-width:430px;margin:0 auto}
@@ -147,7 +152,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 .loc-locked-price{display:inline-flex;align-items:center;gap:5px;background:var(--amber-l);border-radius:var(--rpill);padding:6px 14px;font-size:14px;font-weight:700;color:var(--brown);margin-bottom:16px}
 
 /* NOTES */
-.compose{margin:8px 14px 10px;background:white;border-radius:var(--r);border:1px solid var(--bd);padding:13px;box-shadow:var(--sh)}
+.compose{margin:8px 14px 10px;background:white;border-radius:var(--r);border:1px solid var(--bd);padding:13px;box-shadow:var(--sh);flex-shrink:0}
 .compose-row{display:flex;gap:8px;align-items:flex-end}
 .compose-inp{flex:1;padding:11px 13px;border-radius:var(--rsm);border:1.5px solid var(--bd2);background:var(--cream);font-family:'Nunito',sans-serif;font-size:14px;color:var(--text);outline:none;resize:none;min-height:46px;max-height:110px;transition:border-color .2s;line-height:1.5}
 .compose-inp:focus{border-color:var(--rose)}
@@ -156,7 +161,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 .stickers{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap}
 .stkr{font-size:20px;padding:4px 7px;border-radius:8px;border:1px solid var(--bd);background:var(--cream);cursor:pointer;transition:transform .15s}
 .stkr:active{transform:scale(1.3)}
-.notes-list{padding:0 14px;display:flex;flex-direction:column;gap:8px}
+.notes-list{display:flex;flex-direction:column;gap:8px;flex:1}
 .nbub{max-width:80%;padding:11px 13px;border-radius:16px;animation:popIn .3s ease}
 @keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
 .nbub.me{align-self:flex-end;background:var(--rose);color:white;border-bottom-right-radius:4px}
@@ -214,3 +219,80 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 /* ── ACTIVITY DELETE BUTTON ── */
 .act-del{font-size:13px;color:var(--text3);cursor:pointer;padding:4px 6px;border-radius:6px;line-height:1;transition:all .2s;flex-shrink:0}
 .act-del:hover{background:var(--rose-l);color:var(--rose)}
+
+/* ── RESPONSIVE — small screens (iPhone 13 mini = 375px) ── */
+:root{--r:14px;--rsm:9px;--tab:64px}
+
+@media(max-width:390px){
+  :root{--tab:60px}
+  /* Topbar */
+  .topbar{padding:10px 12px 4px}
+  .topbar-logo{font-size:18px}
+  .streak-badge,.coin-badge{padding:4px 9px}
+  .streak-badge span:last-child,.coin-badge span:last-child{font-size:11px}
+  /* Tabs */
+  .tab{min-width:40px;padding:4px 6px}
+  .tab .ti{font-size:18px}
+  .tab .tl{font-size:9px}
+  /* Cards */
+  .card{padding:12px 13px;margin:0 10px 8px}
+  .banner{margin:6px 10px 8px;padding:13px 14px}
+  .banner-h{font-size:16px}
+  .pcards{gap:6px;margin:0 10px 8px}
+  .pcard{padding:10px}
+  .pcard-av{width:30px;height:30px;font-size:16px}
+  .pcard-name{font-size:12px}
+  .pcard-mood{font-size:18px}
+  .pcard-note{font-size:10px}
+  /* Mood grid — 4 cols on small, keep it tight */
+  .mood-grid{gap:5px}
+  .mood-opt{padding:8px 2px}
+  .mood-opt span:first-child{font-size:20px}
+  .mood-opt span:last-child{font-size:8px}
+  /* Activities */
+  .act-item{gap:8px;padding:9px 0}
+  .act-icon{width:34px;height:34px;font-size:15px;border-radius:9px}
+  .act-name{font-size:12px}
+  .act-desc{font-size:10px}
+  .act-reward{font-size:9px}
+  .act-chk{width:26px;height:26px;font-size:12px}
+  /* Sec header */
+  .sec-title{font-size:19px}
+  .sec-sub{font-size:11px}
+  /* Pet/plant */
+  .pet-art-big{font-size:40px}
+  .slbl{font-size:10px;width:46px}
+  .pet-section,.plant-section{padding:12px 13px;margin:0 10px 8px}
+  /* Buttons */
+  .btn-save{font-size:13px;padding:11px}
+  .btn-main{padding:13px;font-size:15px}
+  /* Notes */
+  .compose{padding:10px}
+  .compose-send{width:40px;height:40px;font-size:16px}
+  .compose-inp{font-size:13px;padding:10px 11px}
+  .nbub{padding:9px 11px}
+  .nbub .nt{font-size:13px}
+  /* Modals */
+  .modal-sh{padding:16px}
+  .modal-title{font-size:17px}
+  /* Settings */
+  .ob-emrow{gap:4px}
+  .ob-em{padding:8px 2px;font-size:20px}
+  /* City */
+  .city-zoom button{width:32px;height:32px;font-size:16px}
+  /* Loc overlay */
+  .loc-title{font-size:16px}
+  .loc-activity-card{padding:13px}
+  .loc-act-text{font-size:13px}
+  /* Dates */
+  .date-days{font-size:17px}
+  .date-name{font-size:13px}
+}
+
+@media(max-width:360px){
+  .mood-grid{grid-template-columns:repeat(4,1fr);gap:4px}
+  .mood-opt{padding:7px 1px}
+  .mood-opt span:first-child{font-size:18px}
+  .tab .tl{display:none}
+  .tab{padding:8px 6px}
+}

@@ -155,7 +155,10 @@
 </div>
 <!-- NOTES -->
 <div class="screen hidden" id="s-notes">
-  <div class="sec-hdr"><div class="sec-title">Love Notes</div><div class="sec-sub">Little messages, big feelings</div></div>
+  <div id="notes-scroll">
+    <div class="sec-hdr"><div class="sec-title">Love Notes</div><div class="sec-sub">Little messages, big feelings</div></div>
+    <div class="notes-list" id="notes-list"></div>
+  </div>
   <div class="compose">
     <div class="compose-row">
       <textarea class="compose-inp" id="note-inp" placeholder="Send a little love..." rows="1" oninput="autoR(this)"></textarea>
@@ -169,7 +172,6 @@
       <button class="stkr" onclick="sendStkr('🌈')">🌈</button><button class="stkr" onclick="sendStkr('💫')">💫</button>
     </div>
   </div>
-  <div class="notes-list" id="notes-list"></div>
 </div>
 <!-- DATES -->
 <div class="screen hidden" id="s-dates">

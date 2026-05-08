@@ -364,9 +364,20 @@ function renderNest(){
 
 // CITY buy
 async function buyLoc(id){
-  const b=BLDGS.find(x=>x.id===id);if(!b||SS.coins<b.cost)return;
-  await updateSS({coins:SS.coins-b.cost,city:{...(SS.city||{}),[id]:true}});
-  toast('🎉 '+b.name+' unlocked!');updateBar();buildCityMap();openLoc(id);
+  const b=BLDGS.find(x=>x.id===id);if(!b)return;
+  if((SS.coins||0)<b.cost){toast('Not enough coins 🪙');return;}
+  const newCity={...(SS.city||{}),[id]:true};
+  const{error}=await db.from('shared_state')
+    .update({coins:SS.coins-b.cost,city:newCity,updated_at:new Date().toISOString()})
+    .eq('couple_id',COUPLE.id);
+  if(error){toast('Error: '+error.message);return;}
+  SS.coins=SS.coins-b.cost;
+  SS.city=newCity;
+  updateBar();
+  toast('🎉 '+b.name+' unlocked!');
+  // Rebuild map then reopen as unlocked
+  buildCityMap();
+  setTimeout(()=>openLoc(id),100);
 }
 
 // NOTES
@@ -383,7 +394,7 @@ function renderNotes(){
       </div>
     </div>`;
   }).join('');
-  setTimeout(()=>{const s=g('s-notes');if(s)s.scrollTop=s.scrollHeight;},60);
+  setTimeout(()=>{const s=g('notes-scroll');if(s)s.scrollTop=s.scrollHeight;},60);
 }
 async function sendNote(){
   const inp=g('note-inp'),txt=inp.value.trim();if(!txt)return;
