@@ -221,7 +221,7 @@ async function tryStreak(){
 async function earnCoins(n){await updateSS({coins:(SS.coins||0)+n});updateBar();coinPop(n);}
 
 // ── UI ───────────────────────────────────────────────────────
-function initUI(){updateBar();updateGreeting();renderHome();renderMood();renderNest();renderNotes();renderDates();goTab('home');}
+function initUI(){updateBar();updateGreeting();renderHome();renderMood();renderNest();renderNotes();renderDates();renderNestActivity();goTab('home');}
 function updateBar(){g('sc').textContent=(SS?.streak||0)===1?'1 day':(SS?.streak||0)+' days';g('cc').textContent=SS?.coins||0;}
 function updateGreeting(){
   const h=new Date().getHours();
@@ -319,13 +319,45 @@ async function saveMood(){
   g('mood-coin-note').textContent='';
   renderMood();renderHome();updateBar();
 }
-function renderMood(){
+async function renderMood(){
   g('pm-e').textContent=P_MOOD?.emoji||'—';
   g('pm-l').textContent=P_MOOD?.label||(PARTNER?'No mood yet':'Waiting for partner...');
   g('pm-n').textContent=P_MOOD?.note?'"'+P_MOOD.note+'"':'';
-  const stressed=['😤','😔','😢','😰','😡','🤒'].includes(P_MOOD?.emoji);
-  g('pm-sug').textContent=P_MOOD?(stressed?'💛 '+(PARTNER?.name||'Partner')+' might be having a rough time. A love note or cozy plan could help.':'✨ '+(PARTNER?.name||'Partner')+' is doing well! A small kind gesture keeps the good vibes going.'):'Your partner hasn\'t shared their mood yet.';
-  g('mhist').textContent='';
+
+  // Smart suggestion based on partner's recent moods
+  if(P_MOOD){
+    const stressed=['😤','😔','😢','😰','😡','🤒'];
+    const positive=['😄','😊','🥰','😌','🤩','😎','🥳'];
+    const isStressed=stressed.includes(P_MOOD.emoji);
+    const isPositive=positive.includes(P_MOOD.emoji);
+    let sug='';
+    if(isStressed) sug='💛 '+(PARTNER?.name||'Partner')+' seems to be having a tough time. A love note or cozy plan tonight could mean a lot.';
+    else if(P_MOOD.emoji==='😴') sug='🌙 '+(PARTNER?.name||'Partner')+' is tired. Maybe suggest an early cozy night in together?';
+    else if(P_MOOD.emoji==='🤔') sug='🫂 '+(PARTNER?.name||'Partner')+' has something on their mind. Ask them about it tonight.';
+    else if(P_MOOD.emoji==='😐') sug='☕ '+(PARTNER?.name||'Partner')+' is feeling meh. A small surprise or kind gesture could turn their day around.';
+    else if(isPositive) sug='✨ '+(PARTNER?.name||'Partner')+' is feeling great! Keep the good energy going — do something fun together.';
+    else sug='💛 Check in with '+(PARTNER?.name||'Partner')+' today and let them know you're thinking of them.';
+    g('pm-sug').textContent=sug;
+  } else {
+    g('pm-sug').textContent='Your partner hasn't shared their mood yet today.';
+  }
+
+  // Load real mood history from DB
+  const{data:moods}=await db.from('moods')
+    .select('*').eq('couple_id',COUPLE.id)
+    .order('created_at',{ascending:false}).limit(14);
+  const hist=g('mhist');
+  if(!moods||moods.length===0){hist.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0">No mood history yet — start sharing!</div>';return;}
+  hist.innerHTML=moods.map(m=>{
+    const mine=m.user_id===ME.id;
+    const who=mine?(ME?.name||'You'):(PARTNER?.name||'Partner');
+    const dt=new Date(m.created_at).toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+    return`<div class="mhrow">
+      <div style="font-size:20px">${m.emoji}</div>
+      <div class="mhinfo"><div class="mhname">${who} · ${m.label}</div>${m.note?`<div class="mhnote">"${m.note}"</div>`:''}</div>
+      <div class="mhtime">${dt}</div>
+    </div>`;
+  }).join('');
 }
 
 // NEST
@@ -347,19 +379,24 @@ function renderNest(){
   ['love','happy','health'].forEach((k,i)=>{const v=[pl,ph,phl][i];g('st-'+k).style.width=v+'%';g('st-'+k+'-n').textContent=v+'%';});
   const ptl=Math.min(Math.floor((pl+ph+phl)/(300/PETS.length)),PETS.length-1);
   g('pet-art').textContent=PETS[ptl];g('pet-in-room').textContent=PETS[ptl];
-  const myFedField=COUPLE?.user1_id===ME?.id?'pet_fed_user1':'pet_fed_user2';
-  const myWatField=COUPLE?.user1_id===ME?.id?'plant_wat_user1':'plant_wat_user2';
+  const iU1=COUPLE?.user1_id===ME?.id;
+  const myFedField=iU1?'pet_fed_user1':'pet_fed_user2';
+  const pFedField =iU1?'pet_fed_user2':'pet_fed_user1';
+  const myWatField=iU1?'plant_wat_user1':'plant_wat_user2';
+  const pWatField =iU1?'plant_wat_user2':'plant_wat_user1';
   const fed=(SS[myFedField]||'')===TODAY();
+  const pFed=(SS[pFedField]||'')===TODAY();
   g('feed-btn').disabled=fed;g('feed-btn').style.opacity=fed?.5:1;
-  g('pet-fed-badge').textContent=fed?'You fed Pebble today ✓':'';
-  g('pet-lim').textContent=fed?'You already fed Pebble — partner can still feed':'Once per day each partner';
+  g('pet-fed-badge').textContent=fed?'You fed Pebble ✓':(pFed?(PARTNER?.name||'Partner')+' fed Pebble ✓':'');
+  g('pet-lim').textContent=fed?'You already fed Pebble today':(pFed?'You can still feed Pebble today!':'Both of you can feed once per day');
   const lvl=Math.min(Math.floor(pp/20),PLANTS.length-1);
   g('plant-art').textContent=PLANTS[lvl];g('plant-bar').style.width=pp+'%';
   g('plant-lbl').textContent=['Seedling','Sprout','Sapling','Young plant','Blooming','In full bloom'][lvl]+' · '+Math.round(pp)+'% grown';
   const wat=(SS[myWatField]||'')===TODAY();
+  const pWat=(SS[pWatField]||'')===TODAY();
   g('water-btn').disabled=wat;g('water-btn').style.opacity=wat?.5:1;
-  g('plant-watered-badge').textContent=wat?'You watered Sprout today 💧':'';
-  g('plant-lim').textContent=wat?'You already watered Sprout — partner can still water':'Once per day each partner';
+  g('plant-watered-badge').textContent=wat?'You watered Sprout 💧':(pWat?(PARTNER?.name||'Partner')+' watered Sprout 💧':'');
+  g('plant-lim').textContent=wat?'You already watered Sprout today':(pWat?'You can still water Sprout today!':'Both of you can water once per day');
 }
 
 // CITY buy
@@ -568,6 +605,7 @@ function renderSettings(){
 
   // Has couple — show invite code + partner status
   const code = COUPLE.invite_code||'—';
+  updateNotifStatus();
   const hasPartner = !!(COUPLE.user1_id && COUPLE.user2_id);
   block.innerHTML = `
     <div class="ob-lbl">Your invite code</div>
@@ -618,6 +656,83 @@ async function saveAvatar(btn){
   g('settings-avatar').textContent = avatar;
   g('settings-av-row').querySelectorAll('.ob-em').forEach(b=>b.classList.toggle('on', b.dataset.e===avatar));
   renderHome(); toast('Avatar updated ✓');
+}
+
+// ── NEST ACTIVITY (interactive home card) ─────────────────
+const NEST_ACTIVITIES=[
+  {q:'What is one thing your partner did recently that made you smile?',type:'reflect'},
+  {q:'Send your partner a voice note right now — just say hi.',type:'action'},
+  {q:'Name one thing you love about your partner that they might not know.',type:'reflect'},
+  {q:'Plan one small thing to do together this week.',type:'action'},
+  {q:'What is your partner's love language? Are you speaking it today?',type:'reflect'},
+  {q:'Send a photo that reminds you of a happy memory together.',type:'action'},
+  {q:'What is something your partner has been working hard on lately?',type:'reflect'},
+  {q:'Write your partner a 3-sentence love letter in the notes tab.',type:'action'},
+];
+
+function renderNestActivity(){
+  const card=g('nest-activity-card');
+  if(!card)return;
+  const idx=Math.floor(Date.now()/86400000)%NEST_ACTIVITIES.length;
+  const act=NEST_ACTIVITIES[idx];
+  const isAction=act.type==='action';
+  card.style.display='block';
+  g('nest-act-content').innerHTML=`
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:10px;font-family:'Lora',serif;font-style:italic">"${act.q}"</div>
+    <div style="display:flex;gap:8px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:4px 10px;border-radius:var(--rpill);background:${isAction?'var(--teal-l)':'var(--amber-l)'};color:${isAction?'var(--teal)':'var(--brown)'}">
+        ${isAction?'🎯 Action':'💭 Reflection'}
+      </div>
+    </div>`;
+}
+
+// ── NOTIFICATION SETTINGS ─────────────────────────────────
+async function updateNotifStatus(){
+  const statusEl=g('notif-status');
+  const toggleEl=g('notif-toggle');
+  if(!statusEl||!toggleEl)return;
+  if(!('Notification' in window)){
+    statusEl.textContent='Not supported on this browser';
+    toggleEl.style.display='none';return;
+  }
+  const perm=Notification.permission;
+  if(perm==='granted'){
+    // Check if actually subscribed
+    const{data:subs}=await db.from('push_subscriptions').select('id').eq('user_id',ME.id);
+    if(subs&&subs.length>0){
+      statusEl.textContent='✓ Enabled — you will receive notifications';
+      toggleEl.textContent='Disable';
+      toggleEl.style.background='var(--text3)';
+    } else {
+      statusEl.textContent='Permission granted but not registered';
+      toggleEl.textContent='Enable';
+      toggleEl.style.background='var(--rose)';
+    }
+  } else if(perm==='denied'){
+    statusEl.textContent='Blocked — enable in your browser settings';
+    toggleEl.textContent='Blocked';
+    toggleEl.disabled=true;
+    toggleEl.style.opacity='.5';
+  } else {
+    statusEl.textContent='Not yet enabled';
+    toggleEl.textContent='Enable';
+    toggleEl.style.background='var(--rose)';
+  }
+}
+
+async function toggleNotifications(){
+  const toggleEl=g('notif-toggle');
+  if(toggleEl.textContent==='Disable'){
+    // Unsubscribe
+    const reg=await navigator.serviceWorker.getRegistration('/sw.js');
+    if(reg){const sub=await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe();}
+    await db.from('push_subscriptions').delete().eq('user_id',ME.id);
+    toast('Notifications disabled');
+  } else {
+    await registerPush();
+    toast('Notifications enabled 🔔');
+  }
+  await updateNotifStatus();
 }
 
 async function settingsJoin(){

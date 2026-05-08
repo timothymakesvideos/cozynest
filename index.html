@@ -54,6 +54,10 @@
     <div class="pcard"><div class="pcard-who">You</div><div class="pcard-av" id="hav-me" style="background:var(--rose-l)">🐻</div><div class="pcard-name" id="hn-me">You</div><div class="pcard-mood" id="hm-me">—</div><div class="pcard-note" id="hnote-me">No mood yet</div></div>
     <div class="pcard"><div class="pcard-who">Partner</div><div class="pcard-av" id="hav-p" style="background:var(--teal-l)">🐱</div><div class="pcard-name" id="hn-p">Partner</div><div class="pcard-mood" id="hm-p">—</div><div class="pcard-note" id="hnote-p">Waiting...</div></div>
   </div>
+  <div id="nest-activity-card" class="card" style="display:none">
+    <div class="ctitle">🎯 Nest activity</div>
+    <div id="nest-act-content"></div>
+  </div>
   <div class="card">
     <div class="ctitle">Today's activities <span style="float:right;font-size:10px;color:var(--text3);font-weight:400">Refreshed daily · earn 🪙</span></div>
     <div id="act-list"></div>
@@ -214,6 +218,17 @@
     <div id="settings-couple-block"></div>
   </div>
 
+  <!-- Notifications -->
+  <div class="card">
+    <div class="ctitle">Notifications</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+      <div>
+        <div style="font-size:14px;font-weight:600">Push notifications</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px" id="notif-status">Checking...</div>
+      </div>
+      <button class="toggle-btn" id="notif-toggle" onclick="toggleNotifications()">Enable</button>
+    </div>
+  </div>
   <!-- Account -->
   <div class="card">
     <div class="ctitle">Account</div>

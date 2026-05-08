@@ -75,12 +75,13 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 .banner-day{font-size:11px;font-weight:700;opacity:.85;text-transform:uppercase;letter-spacing:.07em}
 .banner-h{font-family:'Lora',serif;font-size:19px;font-weight:600;margin-top:3px}
 .pcards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 14px 10px}
-.pcard{background:white;border-radius:var(--r);border:1px solid var(--bd);padding:12px;box-shadow:var(--sh)}
+.pcard{background:white;border-radius:var(--r);border:1px solid var(--bd);padding:12px;box-shadow:var(--sh);min-width:0;overflow:hidden}
 .pcard-who{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
 .pcard-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:6px}
 .pcard-name{font-size:13px;font-weight:700}
 .pcard-mood{font-size:20px;margin-top:2px}
-.pcard-note{font-size:11px;color:var(--text2);margin-top:2px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcard-note{font-size:11px;color:var(--text2);margin-top:2px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pcard-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .act-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
 .act-item:last-child{border-bottom:none}
 .act-icon{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
@@ -301,3 +302,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 .stkr-toggle{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--bd2);background:var(--cream);font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .stkr-toggle:active{transform:scale(.9)}
 .stickers{display:flex;gap:5px;margin-top:9px;flex-wrap:wrap;overflow:hidden;transition:all .2s}
+
+/* ── NOTIFICATION TOGGLE ── */
+.toggle-btn{padding:8px 16px;border-radius:var(--rpill);background:var(--rose);color:white;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:none;cursor:pointer;flex-shrink:0;transition:all .2s}
+.toggle-btn:active{transform:scale(.95)}
