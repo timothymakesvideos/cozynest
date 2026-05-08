@@ -454,33 +454,38 @@ db.auth.onAuthStateChange((event,session)=>{if(session){boot();}else{loading(fal
 // ── SERVICE WORKER + PUSH REGISTRATION ───────────────────────
 async function registerPush(){
   if(!('serviceWorker' in navigator)||!('PushManager' in window)){
-    console.warn('Push not supported in this browser');return;
+    console.warn('Push not supported');return;
   }
   if(!VAPID_PUBLIC_KEY||VAPID_PUBLIC_KEY==='YOUR_VAPID_PUBLIC_KEY'){
-    console.warn('VAPID key not set in config.js');return;
+    console.warn('VAPID key not set');return;
   }
   try{
-    // Register SW — must be at root for full scope
     const reg = await navigator.serviceWorker.register('/sw.js',{scope:'/'});
     await navigator.serviceWorker.ready;
-    // Check existing subscription first
+
+    // Always get/create a fresh subscription
     let sub = await reg.pushManager.getSubscription();
-    if(!sub){
-      const perm = await Notification.requestPermission();
-      if(perm !== 'granted'){console.warn('Push permission denied');return;}
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-    }
-    // Upsert subscription
-    const{error}=await db.from('push_subscriptions').upsert({
+
+    // Unsubscribe old one first so we always get a fresh valid sub
+    if(sub){ await sub.unsubscribe(); }
+
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){console.warn('Push permission denied');return;}
+
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+
+    // Delete any old subscriptions for this user first, then insert fresh one
+    await db.from('push_subscriptions').delete().eq('user_id', ME.id);
+    const{error}=await db.from('push_subscriptions').insert({
       user_id: ME.id,
       couple_id: COUPLE.id,
       endpoint: sub.endpoint,
       subscription: sub.toJSON()
-    },{onConflict:'endpoint'});
-    if(error) console.warn('Push sub save failed:',error.message);
+    });
+    if(error) console.warn('Push save failed:',error.message);
     else console.log('Push registered successfully');
   } catch(e){ console.warn('Push registration failed:',e.message||e); }
 }
