@@ -306,3 +306,7 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 /* ── NOTIFICATION TOGGLE ── */
 .toggle-btn{padding:8px 16px;border-radius:var(--rpill);background:var(--rose);color:white;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;border:none;cursor:pointer;flex-shrink:0;transition:all .2s}
 .toggle-btn:active{transform:scale(.95)}
+
+/* ── LOADING DOTS ANIMATION ── */
+.ldot{width:10px;height:10px;border-radius:50%;background:var(--rose);animation:ldotBounce 1s ease-in-out infinite}
+@keyframes ldotBounce{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-12px);opacity:1}}

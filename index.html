@@ -17,7 +17,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div id="loading-screen" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--cream);z-index:300;font-size:48px">🏠</div>
+<div id="loading-screen" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--cream);z-index:300">
+  <div style="font-size:56px;margin-bottom:16px;animation:float 2s ease-in-out infinite">🏠</div>
+  <div style="font-family:'Lora',serif;font-size:22px;font-weight:600;color:var(--rose);margin-bottom:6px">Cozy Nest</div>
+  <div style="font-size:13px;color:var(--text3);margin-bottom:28px">Loading your nest...</div>
+  <div style="display:flex;gap:8px">
+    <div class="ldot" style="animation-delay:0s"></div>
+    <div class="ldot" style="animation-delay:.2s"></div>
+    <div class="ldot" style="animation-delay:.4s"></div>
+  </div>
+</div>
 <div id="auth-screen" class="hidden"></div>
 
 <!-- COUPLE LINKING SCREEN -->

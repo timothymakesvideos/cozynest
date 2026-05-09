@@ -150,37 +150,76 @@ function loading(on){
 async function boot(){
   loading(true);
   try{
-    const {data:{user}}=await db.auth.getUser();
-    if(!user){loading(false);showAuth('login');return;}
-    const {data:profile}=await db.from('profiles').select('*').eq('id',user.id).single();
-    ME=profile;
-    if(!ME.couple_id){loading(false);showCouple();return;}
-    const {data:couple}=await db.from('couples').select('*').eq('id',ME.couple_id).single();
-    COUPLE=couple;
-    const pid=couple.user1_id===ME.id?couple.user2_id:couple.user1_id;
-    if(pid){const {data:p}=await db.from('profiles').select('*').eq('id',pid).single();PARTNER=p;}
-    let {data:ss}=await db.from('shared_state').select('*').eq('couple_id',COUPLE.id).single();
-    if(!ss){const {data:n}=await db.from('shared_state').insert({couple_id:COUPLE.id}).select().single();ss=n;}
-    SS=ss;
-    const {data:moods}=await db.from('moods').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:false}).limit(30);
-    MY_MOOD=(moods||[]).find(m=>m.user_id===ME.id)||null;
-    P_MOOD=(moods||[]).find(m=>m.user_id!==ME.id)||null;
-    const {data:notes}=await db.from('notes').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:true}).limit(60);
-    NOTES=notes||[];
-    const {data:dates}=await db.from('special_dates').select('*').eq('couple_id',COUPLE.id).order('date',{ascending:true});
-    DATES=dates||[];
-    const {data:ca}=await db.from('custom_activities').select('*').eq('couple_id',COUPLE.id);
-    CUSTOM_ACTS=ca||[];
-    const {data:done}=await db.from('activities').select('act_id').eq('couple_id',COUPLE.id).eq('user_id',ME.id).eq('act_date',TODAY());
-    ACT_DONE_TODAY=(done||[]).map(r=>r.act_id);
+    // Step 1: Auth
+    const {data:{user}, error:authErr} = await db.auth.getUser();
+    console.log('boot: auth', user?.id, authErr?.message);
+    if(authErr||!user){ loading(false); showAuth('login'); return; }
+
+    // Step 2: Profile
+    const {data:profile, error:profErr} = await db.from('profiles').select('*').eq('id',user.id).single();
+    console.log('boot: profile', profile?.id, profErr?.message);
+    if(profErr||!profile){ loading(false); showAuth('login'); return; }
+    ME = profile;
+
+    // Step 3: No couple yet
+    if(!ME.couple_id){ loading(false); showCouple(); return; }
+
+    // Step 4: Couple
+    const {data:couple, error:coupleErr} = await db.from('couples').select('*').eq('id',ME.couple_id).single();
+    console.log('boot: couple', couple?.id, coupleErr?.message);
+    if(coupleErr||!couple){ loading(false); showCouple(); return; }
+    COUPLE = couple;
+
+    // Step 5: Partner (optional — may not have joined yet)
+    const pid = couple.user1_id===ME.id ? couple.user2_id : couple.user1_id;
+    if(pid){
+      const {data:partner} = await db.from('profiles').select('*').eq('id',pid).single();
+      PARTNER = partner||null;
+      console.log('boot: partner', PARTNER?.name);
+    }
+
+    // Step 6: Shared state
+    let {data:ss} = await db.from('shared_state').select('*').eq('couple_id',COUPLE.id).single();
+    if(!ss){
+      const {data:newSS} = await db.from('shared_state').insert({couple_id:COUPLE.id}).select().single();
+      ss = newSS;
+    }
+    SS = ss;
+    console.log('boot: shared_state loaded', !!SS);
+
+    // Step 7: All other data
+    const [moodsRes, notesRes, datesRes, caRes, doneRes] = await Promise.all([
+      db.from('moods').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:false}).limit(30),
+      db.from('notes').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:true}).limit(60),
+      db.from('special_dates').select('*').eq('couple_id',COUPLE.id).order('date',{ascending:true}),
+      db.from('custom_activities').select('*').eq('couple_id',COUPLE.id),
+      db.from('activities').select('act_id').eq('couple_id',COUPLE.id).eq('user_id',ME.id).eq('act_date',TODAY()),
+    ]);
+    const moods = moodsRes.data||[];
+    MY_MOOD  = moods.find(m=>m.user_id===ME.id)||null;
+    P_MOOD   = moods.find(m=>m.user_id!==ME.id)||null;
+    NOTES    = notesRes.data||[];
+    DATES    = datesRes.data||[];
+    CUSTOM_ACTS   = caRes.data||[];
+    ACT_DONE_TODAY= (doneRes.data||[]).map(r=>r.act_id);
+    console.log('boot: all data loaded');
+
+    // Step 8: Show app
     subscribeRT();
     loading(false);
-    g('couple-screen').classList.add('hidden');
     g('auth-screen').classList.add('hidden');
+    g('couple-screen').classList.add('hidden');
     g('app-shell').classList.remove('hidden');
-    initUI();
-  registerPush();
-  }catch(e){console.error(e);loading(false);toast('Error loading — please refresh');}
+    await initUI();
+    registerPush();
+
+  } catch(e) {
+    console.error('boot failed:', e);
+    // Always escape the loading screen
+    loading(false);
+    g('app-shell').classList.remove('hidden');
+    toast('Something went wrong — please refresh');
+  }
 }
 
 // ── REALTIME ─────────────────────────────────────────────────
