@@ -387,10 +387,10 @@ async function renderMood(){
     else if(P_MOOD.emoji==='🤔') sug='🫂 '+(PARTNER?.name||'Partner')+' has something on their mind. Ask them about it tonight.';
     else if(P_MOOD.emoji==='😐') sug='☕ '+(PARTNER?.name||'Partner')+' is feeling meh. A small surprise or kind gesture could turn their day around.';
     else if(isPositive) sug='✨ '+(PARTNER?.name||'Partner')+' is feeling great! Keep the good energy going — do something fun together.';
-    else sug='💛 Check in with '+(PARTNER?.name||'Partner')+' today and let them know you're thinking of them.';
+    else sug='💛 Check in with '+(PARTNER?.name||'Partner')+' today — let them know you are thinking of them.';
     g('pm-sug').textContent=sug;
   } else {
-    g('pm-sug').textContent='Your partner hasn't shared their mood yet today.';
+  g('pm-sug').textContent="Your partner hasn't shared their mood yet today.";
   }
 
   // Load real mood history from DB
@@ -712,14 +712,14 @@ async function saveAvatar(btn){
 
 // ── NEST ACTIVITY (interactive home card) ─────────────────
 const NEST_ACTIVITIES=[
-  {q:'What is one thing your partner did recently that made you smile?',type:'reflect'},
+  {q:"What is one thing your partner did recently that made you smile?",type:'reflect'},
   {q:'Send your partner a voice note right now — just say hi.',type:'action'},
-  {q:'Name one thing you love about your partner that they might not know.',type:'reflect'},
+  {q:"Name one thing you love about your partner that they might not know.",type:'reflect'},
   {q:'Plan one small thing to do together this week.',type:'action'},
-  {q:'What is your partner's love language? Are you speaking it today?',type:'reflect'},
+  {q:"What is your partner's love language? Are you speaking it today?",type:'reflect'},
   {q:'Send a photo that reminds you of a happy memory together.',type:'action'},
-  {q:'What is something your partner has been working hard on lately?',type:'reflect'},
-  {q:'Write your partner a 3-sentence love letter in the notes tab.',type:'action'},
+  {q:"What is something your partner has been working hard on lately?",type:'reflect'},
+  {q:"Write your partner a 3-sentence love letter in the notes tab.",type:'action'},
 ];
 
 function renderNestActivity(){
