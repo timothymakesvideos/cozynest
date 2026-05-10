@@ -231,6 +231,16 @@ function subscribeRT(){
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'shared_state',filter:`couple_id=eq.${COUPLE.id}`},p=>{
       SS=p.new;renderNest();updateBar();
+      // If sequence modal is open, refresh it
+      const modal = document.getElementById('modal-sequence');
+      if(modal && !modal.classList.contains('hidden')){
+        const seqId = modal.dataset.seqid;
+        if(seqId){
+          const roomKey = Object.keys(ACTIVITY_SEQUENCES).find(k=>ACTIVITY_SEQUENCES[k].id===seqId);
+          if(roomKey) renderSequenceModal(ACTIVITY_SEQUENCES[roomKey]);
+        }
+      }
+      renderNestRooms();
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes',filter:`couple_id=eq.${COUPLE.id}`},p=>{
       if(p.new.user_id!==ME.id){NOTES.push(p.new);renderNotes();}
@@ -265,6 +275,7 @@ async function initUI(){
   updateGreeting();
   renderHome();
   renderNest();
+  renderNestRooms();
   renderNotes();
   renderDates();
   renderNestActivity();
@@ -548,7 +559,7 @@ async function deleteDate(id){
 
 // TABS
 const TABS=['home','mood','nest','city','notes','dates','settings'];
-function goTab(t){TABS.forEach(x=>{g('s-'+x).classList.add('hidden');g('t-'+x).classList.remove('on');});g('s-'+t).classList.remove('hidden');g('t-'+t).classList.add('on');if(t==='notes')setTimeout(()=>{const s=g('s-notes');s.scrollTop=s.scrollHeight;},80);if(t==='city')buildCityMap();if(t==='settings')renderSettings();}
+function goTab(t){TABS.forEach(x=>{g('s-'+x).classList.add('hidden');g('t-'+x).classList.remove('on');});g('s-'+t).classList.remove('hidden');g('t-'+t).classList.add('on');if(t==='notes')setTimeout(()=>{const s=g('s-notes');s.scrollTop=s.scrollHeight;},80);if(t==='city')buildCityMap();if(t==='settings')renderSettings();if(t==='nest'){renderNestRooms();renderNest();}}
 
 // MODALS
 function showModal(id){if(id==='modal-date')g('date-date-inp').value=TODAY();g(id).classList.remove('hidden');}
@@ -737,6 +748,160 @@ function renderNestActivity(){
         ${isAction?'🎯 Action':'💭 Reflection'}
       </div>
     </div>`;
+}
+
+// ── INTERACTIVE ACTIVITY SEQUENCES ───────────────────────────
+// Each room can have a multi-step turn-based sequence tracked in shared_state.
+// State stored in SS.activity_sequences: { [sequenceId]: { step, completedBy, startedAt, done } }
+
+const ACTIVITY_SEQUENCES = {
+  kitchen: {
+    id: 'kitchen_cook',
+    title: '🍳 Cook Together',
+    icon: '🍳',
+    coins: 20,
+    steps: [
+      { role: 1, text: 'Wash and chop the vegetables', icon: '🥕' },
+      { role: 2, text: 'Season and prep the meat or protein', icon: '🥩' },
+      { role: 1, text: 'Add the vegetables to the pot', icon: '🥘' },
+      { role: 2, text: 'Cook everything and stir together', icon: '🔥' },
+      { role: 1, text: 'Set the table and plate the food', icon: '🍽️' },
+    ]
+  },
+  living: {
+    id: 'living_movie',
+    title: '🎬 Movie Night Setup',
+    icon: '🎬',
+    coins: 15,
+    steps: [
+      { role: 1, text: 'Pick tonight\'s movie or show', icon: '📺' },
+      { role: 2, text: 'Prepare snacks and drinks', icon: '🍿' },
+      { role: 1, text: 'Get the blankets and pillows ready', icon: '🛋️' },
+      { role: 2, text: 'Dim the lights and start the film', icon: '🌙' },
+    ]
+  },
+  garden: {
+    id: 'garden_walk',
+    title: '🌿 Garden Ritual',
+    icon: '🌿',
+    coins: 12,
+    steps: [
+      { role: 1, text: 'Water the plants together', icon: '💧' },
+      { role: 2, text: 'Clear any leaves or tidy up', icon: '🍂' },
+      { role: 1, text: 'Pick a spot and sit outside for 5 minutes', icon: '☀️' },
+      { role: 2, text: 'Share one thing you noticed outside today', icon: '💬' },
+    ]
+  },
+  bedroom: {
+    id: 'bedroom_wind',
+    title: '🌙 Wind Down Together',
+    icon: '🌙',
+    coins: 12,
+    steps: [
+      { role: 1, text: 'Put both phones on Do Not Disturb', icon: '📵' },
+      { role: 2, text: 'Make a warm drink for both of you', icon: '☕' },
+      { role: 1, text: 'Share one thing you\'re grateful for today', icon: '💛' },
+      { role: 2, text: 'Give your partner a goodnight compliment', icon: '🌸' },
+    ]
+  },
+};
+
+function getSeqState(seqId){
+  return (SS?.activity_sequences || {})[seqId] || null;
+}
+
+function isUser1(){ return COUPLE?.user1_id === ME?.id; }
+function myRole(){ return isUser1() ? 1 : 2; }
+function partnerRole(){ return isUser1() ? 2 : 1; }
+
+function openSequence(roomId){
+  const seq = ACTIVITY_SEQUENCES[roomId];
+  if(!seq){ toast('No sequence for this room yet'); return; }
+  const modal = document.getElementById('modal-sequence');
+  modal.dataset.seqid = seq.id;
+  renderSequenceModal(seq);
+  modal.classList.remove('hidden');
+}
+
+function renderSequenceModal(seq){
+  const state = getSeqState(seq.id);
+  const modal = document.getElementById('modal-sequence');
+  const body = document.getElementById('seq-body');
+  const currentStep = state ? state.step : 0;
+  const isDone = state?.done;
+  const myR = myRole();
+
+  let html = `<div style="font-size:28px;text-align:center;margin-bottom:4px">${seq.icon}</div>
+    <div style="font-family:'Lora',serif;font-size:17px;font-weight:600;text-align:center;color:var(--text);margin-bottom:16px">${seq.title}</div>`;
+
+  if(isDone){
+    html += `<div style="text-align:center;padding:20px 0">
+      <div style="font-size:40px">🎉</div>
+      <div style="font-size:14px;font-weight:600;color:var(--sage);margin-top:8px">Sequence complete!</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">+${seq.coins} 🪙 earned</div>
+      <button class="btn-save" style="margin-top:14px;background:var(--text2)" onclick="resetSequence('${seq.id}')">Start over</button>
+    </div>`;
+  } else {
+    html += seq.steps.map((step, i) => {
+      const done = i < currentStep;
+      const active = i === currentStep;
+      const isMyTurn = active && step.role === myR;
+      const isPartnerTurn = active && step.role !== myR;
+      const partnerName = PARTNER?.name || 'Partner';
+      const myName = ME?.name || 'You';
+      const whoLabel = step.role === myR ? myName : partnerName;
+
+      let bg = 'var(--bd)';
+      let opacity = '0.45';
+      let border = '1.5px solid transparent';
+      if(done){ bg = 'var(--sage-l)'; opacity = '1'; border = '1.5px solid var(--sage)'; }
+      if(isMyTurn){ bg = 'var(--rose-l)'; opacity = '1'; border = '1.5px solid var(--rose)'; }
+      if(isPartnerTurn){ bg = 'var(--amber-l)'; opacity = '1'; border = '1.5px solid var(--amber)'; }
+
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:${bg};border:${border};opacity:${opacity};margin-bottom:8px">
+        <div style="font-size:22px;flex-shrink:0">${done ? '✅' : step.icon}</div>
+        <div style="flex:1">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:${done?'var(--sage)':isMyTurn?'var(--rose)':'var(--brown)'};margin-bottom:2px">${done?'Done':isMyTurn?'Your turn':''+whoLabel+''}</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.4">${step.text}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    if(currentStep < seq.steps.length){
+      const active = seq.steps[currentStep];
+      const isMyT = active.role === myR;
+      if(isMyT){
+        html += `<button class="btn-save" style="margin-top:6px" onclick="advanceSequence('${seq.id}')">Mark my step done ✓</button>`;
+      } else {
+        html += `<div style="text-align:center;padding:10px 0;font-size:13px;color:var(--text3)">⏳ Waiting for ${PARTNER?.name||'your partner'} to complete their step...</div>`;
+      }
+    }
+  }
+
+  body.innerHTML = html;
+}
+
+async function advanceSequence(seqId){
+  const seq = ACTIVITY_SEQUENCES[Object.keys(ACTIVITY_SEQUENCES).find(k => ACTIVITY_SEQUENCES[k].id === seqId)];
+  if(!seq) return;
+  const state = getSeqState(seqId) || { step: 0, done: false };
+  const nextStep = state.step + 1;
+  const done = nextStep >= seq.steps.length;
+  const newState = { step: nextStep, done, completedAt: done ? new Date().toISOString() : null };
+  const newSeqs = { ...(SS.activity_sequences || {}), [seqId]: newState };
+  await updateSS({ activity_sequences: newSeqs });
+  if(done){ await earnCoins(seq.coins); toast('Sequence complete! +'+seq.coins+' 🪙 🎉'); }
+  else { toast('Step done! Partner\'s turn 💛'); sendPushNotification('note', (ME?.name||'You')+' completed a step — your turn!'); }
+  renderSequenceModal(seq);
+}
+
+async function resetSequence(seqId){
+  const newSeqs = { ...(SS.activity_sequences || {}) };
+  delete newSeqs[seqId];
+  await updateSS({ activity_sequences: newSeqs });
+  const seq = ACTIVITY_SEQUENCES[Object.keys(ACTIVITY_SEQUENCES).find(k => ACTIVITY_SEQUENCES[k].id === seqId)];
+  if(seq) renderSequenceModal(seq);
+  toast('Starting fresh! 🌱');
 }
 
 // ── NOTIFICATION SETTINGS ─────────────────────────────────
@@ -988,6 +1153,11 @@ function renderNestRooms(){
 function renderNestRoom(idx){
   nestRoomIdx = idx;
   const room = NEST_ROOMS[idx];
+  const c = getRoomColors();
+  const pet = document.getElementById('pet-art')?.textContent || '🐣';
+  // Update SVG preview
+  const svgEl = document.getElementById('nest-room-svg');
+  if(svgEl) svgEl.innerHTML = room.svg(c, pet);
   // Update dots
   const dotsEl = document.getElementById('nest-room-dots');
   if(dotsEl) dotsEl.innerHTML = NEST_ROOMS.map((r,i)=>
@@ -1003,11 +1173,20 @@ function renderNestRoom(idx){
   if(next) next.style.opacity = idx===NEST_ROOMS.length-1?'0.3':'1';
   // Update activity
   const promptEl = document.getElementById('nest-room-prompt');
-  if(promptEl) promptEl.innerHTML = `
-    <div style="font-size:28px;flex-shrink:0">${room.activity.icon}</div>
-    <div>
-      <div style="font-size:13px;line-height:1.6;color:var(--text2);font-style:italic">"${room.activity.text}"</div>
-    </div>`;
+  if(promptEl){
+    const seq = ACTIVITY_SEQUENCES[room.id];
+    const seqState = seq ? getSeqState(seq.id) : null;
+    const seqStep = seqState ? seqState.step : 0;
+    const seqDone = seqState?.done;
+    let seqBtnLabel = seq ? (seqDone ? '🔁 Redo sequence' : seqStep > 0 ? `▶ Continue (step ${seqStep+1}/${seq.steps.length})` : '▶ Start sequence') : '';
+    let seqBtnColor = seqDone ? 'var(--text2)' : seqStep > 0 ? 'var(--teal)' : 'var(--rose)';
+    promptEl.innerHTML = `
+      <div style="font-size:28px;flex-shrink:0">${room.activity.icon}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;line-height:1.6;color:var(--text2);font-style:italic;margin-bottom:${seq?'10px':'0'}">"${room.activity.text}"</div>
+        ${seq ? `<button class="btn-save" style="background:${seqBtnColor};margin-top:0;padding:9px 16px;font-size:13px" onclick="openSequence('${room.id}')">${seqBtnLabel}</button>` : ''}
+      </div>`;
+  }
   // Update decor shop
   const shopEl = document.getElementById('nest-decor-shop');
   const c = getRoomColors();

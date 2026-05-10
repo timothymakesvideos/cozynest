@@ -348,6 +348,14 @@
     <button class="btn-main" style="margin-top:4px" onclick="saveCustomize()">Save changes ✓</button>
   </div>
 </div>
+<!-- MODAL: ACTIVITY SEQUENCE -->
+<div class="modal-ov hidden" id="modal-sequence" data-seqid="" onclick="ovClose(event,'modal-sequence')">
+  <div class="modal-sh" style="max-height:82vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="seq-body"></div>
+    <button class="btn-cancel" style="margin-top:8px" onclick="hideModal('modal-sequence')">Close</button>
+  </div>
+</div>
 </div><!-- /app-shell -->
 <script src="config.js"></script>
 <script src="app.js"></script>
