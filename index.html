@@ -5,12 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Cozy Nest">
 <meta name="theme-color" content="#FFF8F3">
 <title>Cozy Nest</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23E8735A'/><text y='.9em' font-size='72' x='12'>🏠</text></svg>">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23E8735A'/><text y='.9em' font-size='72' x='12'>🏠</text></svg>">
+<link rel="icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
@@ -115,33 +119,33 @@
 <!-- NEST -->
 <div class="screen hidden" id="s-nest">
   <div class="sec-hdr"><div class="sec-title">Our Nest</div><div class="sec-sub" id="nest-sub">Day 1 · 0 day streak</div></div>
-  <div class="room-art">
-    <svg viewBox="0 0 340 220" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:340px">
-      <rect x="0" y="155" width="340" height="65" fill="#F5EDE9" rx="3"/><rect x="0" y="0" width="340" height="158" fill="#FFF8F3"/>
-      <ellipse cx="170" cy="163" rx="98" ry="16" fill="#FDEEE9" stroke="#F5A48B" stroke-width="1.5"/>
-      <rect x="78" y="112" width="132" height="52" rx="14" fill="#E8A83A" opacity=".85"/>
-      <rect x="78" y="103" width="132" height="24" rx="10" fill="#BA7517" opacity=".7"/>
-      <rect x="78" y="108" width="19" height="58" rx="8" fill="#BA7517" opacity=".65"/>
-      <rect x="191" y="108" width="19" height="58" rx="8" fill="#BA7517" opacity=".65"/>
-      <ellipse cx="122" cy="116" rx="17" ry="9" fill="#FDEEE9" opacity=".9"/>
-      <ellipse cx="162" cy="116" rx="17" ry="9" fill="#EBF5F5" opacity=".9"/>
-      <rect x="218" y="28" width="82" height="72" rx="6" fill="#EBF5F5" stroke="#B8958A" stroke-width="1.5"/>
-      <line x1="259" y1="28" x2="259" y2="100" stroke="#B8958A" stroke-width="1.5"/>
-      <line x1="218" y1="64" x2="300" y2="64" stroke="#B8958A" stroke-width="1.5"/>
-      <circle cx="238" cy="48" r="11" fill="#EF9F27" opacity=".55"/>
-      <rect x="28" y="48" width="62" height="82" rx="4" fill="#8B6355" opacity=".65"/>
-      <rect x="28" y="48" width="62" height="8" rx="2" fill="#7A5C52"/>
-      <rect x="33" y="60" width="8" height="30" rx="2" fill="#E8735A" opacity=".9"/>
-      <rect x="43" y="60" width="8" height="25" rx="2" fill="#5BA4A4" opacity=".9"/>
-      <rect x="53" y="60" width="8" height="28" rx="2" fill="#E8A83A" opacity=".9"/>
-      <rect x="63" y="60" width="8" height="22" rx="2" fill="#7BA68A" opacity=".9"/>
-      <rect x="294" y="138" width="15" height="22" rx="3" fill="#8B6355" opacity=".65"/>
-      <circle cx="301" cy="128" r="17" fill="#7BA68A" opacity=".8"/>
-      <rect x="222" y="128" width="5" height="30" fill="#B8958A"/>
-      <polygon points="212,128 242,128 232,109 222,109" fill="#EF9F27" opacity=".8"/>
-      <text x="142" y="116" font-size="20" id="pet-in-room" text-anchor="middle">🐾</text>
-    </svg>
+
+  <!-- Room navigator -->
+  <div id="nest-rooms-container" class="card" style="padding:12px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <button class="nest-nav-btn" onclick="goNestRoom(Math.max(nestRoomIdx-1,0))">‹</button>
+      <div id="nest-room-name" style="font-family:'Lora',serif;font-size:16px;font-weight:600;color:var(--text)">🛋️ Living Room</div>
+      <button class="nest-nav-btn" onclick="goNestRoom(Math.min(nestRoomIdx+1,3))">›</button>
+    </div>
+    <!-- Room SVG -->
+    <div id="nest-room-svg" style="transition:opacity .25s,transform .25s"></div>
+    <!-- Room dots -->
+    <div id="nest-room-dots" style="display:flex;justify-content:center;gap:6px;margin-top:8px"></div>
   </div>
+
+  <!-- Daily prompt for this room -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="ctitle">Room activity</div>
+    <div id="nest-room-prompt" style="display:flex;align-items:flex-start;gap:12px"></div>
+  </div>
+
+  <!-- Decor shop -->
+  <div class="card" style="margin-bottom:10px">
+    <div class="ctitle">Decorate this room <span style="float:right;font-size:10px;color:var(--text3);font-weight:400">spend 🪙 to add items</span></div>
+    <div id="nest-decor-shop" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  </div>
+
+  <!-- Pet + Plant -->
   <div class="pet-section">
     <div class="pet-h"><div class="pet-name">🐾 Pebble</div><div id="pet-fed-badge" style="font-size:10px;color:var(--sage);font-weight:700"></div></div>
     <span class="pet-art-big" id="pet-art">🐣</span>
@@ -303,9 +307,51 @@
   </div>
 </div>
 </div><!-- /app -->
+<!-- CUSTOMIZE MODAL -->
+<div class="modal-ov hidden" id="modal-customize" onclick="ovClose(event,'modal-customize')">
+  <div class="modal-sh">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Customize your nest ✦</div>
+    <div class="modal-field">
+      <div class="modal-lbl">Wall color</div>
+      <div class="color-row" id="wall-colors">
+        <div class="color-chip on" data-color="#FFF8F3" style="background:#FFF8F3" onclick="pickColor(this,'wall')"></div>
+        <div class="color-chip" data-color="#EBF5F5" style="background:#EBF5F5" onclick="pickColor(this,'wall')"></div>
+        <div class="color-chip" data-color="#EDF4F0" style="background:#EDF4F0" onclick="pickColor(this,'wall')"></div>
+        <div class="color-chip" data-color="#FEF5E4" style="background:#FEF5E4" onclick="pickColor(this,'wall')"></div>
+        <div class="color-chip" data-color="#F3E5F5" style="background:#F3E5F5" onclick="pickColor(this,'wall')"></div>
+        <div class="color-chip" data-color="#E8F5E9" style="background:#E8F5E9" onclick="pickColor(this,'wall')"></div>
+      </div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-lbl">Floor color</div>
+      <div class="color-row" id="floor-colors">
+        <div class="color-chip on" data-color="#F5EDE9" style="background:#F5EDE9" onclick="pickColor(this,'floor')"></div>
+        <div class="color-chip" data-color="#E8D5C0" style="background:#E8D5C0" onclick="pickColor(this,'floor')"></div>
+        <div class="color-chip" data-color="#D4C5B0" style="background:#D4C5B0" onclick="pickColor(this,'floor')"></div>
+        <div class="color-chip" data-color="#C8D8C0" style="background:#C8D8C0" onclick="pickColor(this,'floor')"></div>
+        <div class="color-chip" data-color="#D0D8E8" style="background:#D0D8E8" onclick="pickColor(this,'floor')"></div>
+        <div class="color-chip" data-color="#2C1810" style="background:#2C1810" onclick="pickColor(this,'floor')"></div>
+      </div>
+    </div>
+    <div class="modal-field">
+      <div class="modal-lbl">Sofa color</div>
+      <div class="color-row" id="sofa-colors">
+        <div class="color-chip on" data-color="#E8A83A" style="background:#E8A83A" onclick="pickColor(this,'sofa')"></div>
+        <div class="color-chip" data-color="#E8735A" style="background:#E8735A" onclick="pickColor(this,'sofa')"></div>
+        <div class="color-chip" data-color="#5BA4A4" style="background:#5BA4A4" onclick="pickColor(this,'sofa')"></div>
+        <div class="color-chip" data-color="#7BA68A" style="background:#7BA68A" onclick="pickColor(this,'sofa')"></div>
+        <div class="color-chip" data-color="#9C77B0" style="background:#9C77B0" onclick="pickColor(this,'sofa')"></div>
+        <div class="color-chip" data-color="#3D2B23" style="background:#3D2B23" onclick="pickColor(this,'sofa')"></div>
+      </div>
+    </div>
+    <button class="btn-main" style="margin-top:4px" onclick="saveCustomize()">Save changes ✓</button>
+  </div>
+</div>
 </div><!-- /app-shell -->
 <script src="config.js"></script>
 <script src="app.js"></script>
 <script src="city.js"></script>
+<script src="nest.js"></script>
 </body>
 </html>

@@ -802,3 +802,269 @@ async function settingsJoin(){
   toast('Linked with your partner! 💛');
   await boot();
 }
+
+// ── NEST ROOMS ────────────────────────────────────────────────
+let nestRoomIdx = 0;
+
+const NEST_ROOMS = [
+  {
+    id: 'living', name: '🛋️ Living Room',
+    activity: { icon:'💬', text:'Sit on the couch together tonight — no phones. Share the best and worst part of your day.' },
+    decor: [
+      {id:'plant_big',name:'Big Plant',icon:'🪴',cost:30},
+      {id:'fairy_lights',name:'Fairy Lights',icon:'✨',cost:40},
+      {id:'painting',name:'Wall Art',icon:'🖼️',cost:50},
+      {id:'cat_bed',name:'Pet Bed',icon:'🛏️',cost:35},
+    ],
+    svg: (c,pet) => `<svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">
+      <rect width="340" height="200" fill="${c.wall}"/>
+      <rect y="155" width="340" height="45" fill="${c.floor}"/>
+      <ellipse cx="170" cy="160" rx="95" ry="14" fill="rgba(0,0,0,.06)"/>
+      <rect x="75" y="108" width="140" height="50" rx="13" fill="${c.sofa}" opacity=".9"/>
+      <rect x="75" y="99" width="140" height="22" rx="10" fill="${c.sofa}" opacity=".7" style="filter:brightness(.85)"/>
+      <rect x="75" y="104" width="20" height="54" rx="8" fill="${c.sofa}" opacity=".7" style="filter:brightness(.8)"/>
+      <rect x="195" y="104" width="20" height="54" rx="8" fill="${c.sofa}" opacity=".7" style="filter:brightness(.8)"/>
+      <ellipse cx="122" cy="112" rx="18" ry="9" fill="white" opacity=".35"/>
+      <ellipse cx="168" cy="112" rx="18" ry="9" fill="white" opacity=".25"/>
+      <rect x="215" y="24" width="88" height="76" rx="6" fill="#EBF5F5" stroke="#B8958A" stroke-width="1.5"/>
+      <line x1="259" y1="24" x2="259" y2="100" stroke="#B8958A" stroke-width="1.5"/>
+      <line x1="215" y1="62" x2="303" y2="62" stroke="#B8958A" stroke-width="1.5"/>
+      <circle cx="236" cy="45" r="12" fill="#FFD54F" opacity=".55"/>
+      <rect x="24" y="44" width="66" height="88" rx="4" fill="#8B6355" opacity=".6"/>
+      <rect x="24" y="44" width="66" height="9" rx="2" fill="#7A5C52"/>
+      ${[0,1,2,3].map(i=>`<rect x="${30+i*14}" y="${57}" width="10" height="${26+i%2*8}" rx="2" fill="${['#E8735A','#5BA4A4','#E8A83A','#7BA68A'][i]}" opacity=".9"/>`).join('')}
+      ${[0,1,2,3].map(i=>`<rect x="${30+i*14}" y="${90}" width="10" height="${22+i%3*6}" rx="2" fill="${['#5BA4A4','#E8A83A','#E8735A','#7BA68A'][i]}" opacity=".85"/>`).join('')}
+      <rect x="295" y="134" width="14" height="22" rx="3" fill="#8B6355" opacity=".6"/>
+      <circle cx="302" cy="125" r="16" fill="#7BA68A" opacity=".85"/>
+      <circle cx="294" cy="132" r="10" fill="#5BA4A4" opacity=".7"/>
+      <rect x="220" y="122" width="5" height="32" fill="#B8958A"/>
+      <polygon points="210,122 240,122 230,104 220,104" fill="#EF9F27" opacity=".8"/>
+      ${c.decor?.fairy_lights?'<path d="M20,30 Q85,18 170,22 Q255,18 320,30" fill="none" stroke="#FFE082" stroke-width="1.5" opacity=".7"/><circle cx="60" cy="25" r="3" fill="#FFE082"/><circle cx="120" cy="21" r="3" fill="#FFE082"/><circle cx="170" cy="22" r="3" fill="#FFE082"/><circle cx="220" cy="21" r="3" fill="#FFE082"/><circle cx="280" cy="25" r="3" fill="#FFE082"/>':''}
+      ${c.decor?.plant_big?'<rect x="8" y="128" width="14" height="26" rx="3" fill="#8B6355" opacity=".6"/><circle cx="15" cy="112" r="20" fill="#66BB6A" opacity=".85"/><circle cx="6" cy="122" r="13" fill="#43A047" opacity=".7"/>':''}
+      ${c.decor?.painting?'<rect x="140" y="18" width="54" height="38" rx="3" fill="white" stroke="#B8958A" stroke-width="1.5"/><rect x="144" y="22" width="46" height="30" rx="2" fill="#EBF5F5"/><circle cx="167" cy="37" r="8" fill="#E8735A" opacity=".6"/><circle cx="175" cy="32" r="5" fill="#5BA4A4" opacity=".6"/>':''}
+      ${c.decor?.cat_bed?`<ellipse cx="145" cy="155" rx="18" ry="10" fill="#FDEEE9" stroke="#F5A48B" stroke-width="1.5"/><text x="145" y="159" font-size="14" text-anchor="middle">${pet}</text>`:`<text x="145" y="159" font-size="16" text-anchor="middle">${pet}</text>`}
+    </svg>`
+  },
+  {
+    id: 'kitchen', name: '🍳 Kitchen',
+    activity: { icon:'🍳', text:'Cook or bake something together this week — even just breakfast counts.' },
+    decor: [
+      {id:'herb_garden',name:'Herb Garden',icon:'🌿',cost:25},
+      {id:'coffee_maker',name:'Coffee Maker',icon:'☕',cost:45},
+      {id:'fruit_bowl',name:'Fruit Bowl',icon:'🍎',cost:20},
+      {id:'wine_rack',name:'Wine Rack',icon:'🍷',cost:55},
+    ],
+    svg: (c,pet) => `<svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">
+      <rect width="340" height="200" fill="${c.wall}"/>
+      <rect y="148" width="340" height="52" fill="${c.floor}"/>
+      <!-- Tiles -->
+      ${Array.from({length:8},(_,i)=>Array.from({length:3},(_,j)=>`<rect x="${i*44}" y="${j*18+60}" width="42" height="16" rx="1" fill="white" stroke="#E0D0C8" stroke-width=".5" opacity=".4"/>`).join('')).join('')}
+      <!-- Counter -->
+      <rect x="0" y="112" width="340" height="40" fill="#8B6355" opacity=".55"/>
+      <rect x="0" y="108" width="340" height="10" rx="2" fill="#6D4C41" opacity=".7"/>
+      <!-- Stove -->
+      <rect x="100" y="68" width="80" height="46" rx="4" fill="#5D4037" opacity=".75"/>
+      <rect x="108" y="75" width="64" height="32" rx="3" fill="#3E2723" opacity=".9"/>
+      <circle cx="120" cy="86" r="8" fill="#1A1A1A" opacity=".7"/>
+      <circle cx="140" cy="86" r="8" fill="#1A1A1A" opacity=".7"/>
+      <circle cx="160" cy="86" r="8" fill="#1A1A1A" opacity=".7"/>
+      <!-- Fridge -->
+      <rect x="265" y="28" width="60" height="84" rx="5" fill="#ECEFF1" stroke="#B0BEC5" stroke-width="1.5"/>
+      <rect x="265" y="28" width="60" height="46" rx="5" fill="#F5F5F5"/>
+      <line x1="265" y1="74" x2="325" y2="74" stroke="#B0BEC5" stroke-width="1.5"/>
+      <rect x="318" y="48" width="5" height="16" rx="2" fill="#90A4AE"/>
+      <rect x="318" y="82" width="5" height="16" rx="2" fill="#90A4AE"/>
+      <!-- Cabinets -->
+      <rect x="0" y="24" width="90" height="56" rx="4" fill="#8B6355" opacity=".55"/>
+      <rect x="4" y="28" width="40" height="48" rx="3" fill="#A1887F" opacity=".4"/>
+      <rect x="47" y="28" width="40" height="48" rx="3" fill="#A1887F" opacity=".4"/>
+      <circle cx="25" cy="52" r="3" fill="#E8A83A" opacity=".8"/>
+      <circle cx="67" cy="52" r="3" fill="#E8A83A" opacity=".8"/>
+      <!-- Sink -->
+      <rect x="196" y="110" width="60" height="32" rx="4" fill="#90A4AE" opacity=".6"/>
+      <circle cx="226" cy="120" r="5" fill="#607D8B"/>
+      ${c.decor?.coffee_maker?'<rect x="30" y="80" width="28" height="34" rx="4" fill="#3D2B23" opacity=".85"/><rect x="34" y="84" width="20" height="12" rx="2" fill="#1A1A1A"/><circle cx="44" cy="106" r="7" fill="#6D4C41" stroke="#E8A83A" stroke-width="1.5"/>':''}
+      ${c.decor?.herb_garden?'<rect x="0" y="58" width="96" height="12" rx="2" fill="#A5D6A7" opacity=".4"/><text x="8" y="68" font-size="12">🌿</text><text x="28" y="68" font-size="12">🌱</text><text x="48" y="68" font-size="12">🌿</text><text x="68" y="68" font-size="12">🌱</text>':''}
+      ${c.decor?.fruit_bowl?'<circle cx="165" cy="108" r="12" fill="#FFCC02" opacity=".8"/><text x="155" y="112" font-size="14">🍎</text>':''}
+      ${c.decor?.wine_rack?'<rect x="205" y="62" width="44" height="46" rx="3" fill="#5D4037" opacity=".6"/><circle cx="218" cy="75" r="5" fill="#9C3030" opacity=".7"/><circle cx="235" cy="75" r="5" fill="#9C3030" opacity=".7"/><circle cx="218" cy="92" r="5" fill="#9C3030" opacity=".6"/><circle cx="235" cy="92" r="5" fill="#9C3030" opacity=".6"/>':''}
+      <text x="50" y="158" font-size="16" text-anchor="middle">${pet}</text>
+    </svg>`
+  },
+  {
+    id: 'garden', name: '🌿 Garden',
+    activity: { icon:'🚶', text:'Go outside together for 15 minutes. Leave your phones at home.' },
+    decor: [
+      {id:'fountain',name:'Fountain',icon:'⛲',cost:60},
+      {id:'bbq',name:'BBQ Grill',icon:'🔥',cost:50},
+      {id:'hammock',name:'Hammock',icon:'🌴',cost:45},
+      {id:'bird_feeder',name:'Bird Feeder',icon:'🐦',cost:30},
+    ],
+    svg: (c,pet) => `<svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">
+      <rect width="340" height="200" fill="#B3E5FC" opacity=".4"/>
+      <rect width="340" height="200" fill="#C8E6C9"/>
+      <rect y="0" width="340" height="90" fill="#B3E5FC" opacity=".5"/>
+      <circle cx="290" cy="36" r="28" fill="#FFD54F" opacity=".9"/>
+      <ellipse cx="80" cy="20" rx="40" ry="16" fill="white" opacity=".8"/>
+      <ellipse cx="200" cy="14" rx="34" ry="14" fill="white" opacity=".7"/>
+      <rect y="140" width="340" height="60" fill="#A5D6A7" opacity=".6"/>
+      <!-- Path -->
+      <ellipse cx="170" cy="165" rx="60" ry="14" fill="#DCEDC8" opacity=".8"/>
+      <!-- Big trees -->
+      <circle cx="44" cy="82" r="38" fill="#66BB6A" opacity=".9"/>
+      <circle cx="44" cy="66" r="28" fill="#43A047" opacity=".8"/>
+      <rect x="38" y="118" width="14" height="32" fill="#5D4037" opacity=".8"/>
+      <circle cx="296" cy="86" r="34" fill="#66BB6A" opacity=".9"/>
+      <circle cx="296" cy="70" r="26" fill="#388E3C" opacity=".8"/>
+      <rect x="290" y="118" width="14" height="32" fill="#5D4037" opacity=".8"/>
+      <!-- Bench -->
+      <rect x="148" y="128" width="60" height="8" rx="3" fill="#A1887F"/>
+      <rect x="152" y="118" width="8" height="18" rx="2" fill="#8D6E63"/>
+      <rect x="196" y="118" width="8" height="18" rx="2" fill="#8D6E63"/>
+      <rect x="148" y="118" width="60" height="6" rx="2" fill="#A1887F"/>
+      <!-- Flowers -->
+      <text x="108" y="148" font-size="14">🌸</text><text x="128" y="142" font-size="12">🌷</text>
+      <text x="220" y="148" font-size="14">🌼</text><text x="240" y="142" font-size="12">🌸</text>
+      ${c.decor?.fountain?'<circle cx="170" cy="105" r="22" fill="#B2EBF2" stroke="#5BA4A4" stroke-width="2"/><circle cx="170" cy="105" r="12" fill="#5BA4A4" opacity=".4"/><text x="170" y="112" font-size="14" text-anchor="middle">⛲</text>':''}
+      ${c.decor?.bbq?'<rect x="220" y="110" width="36" height="28" rx="4" fill="#3D2B23" opacity=".8"/><rect x="226" y="106" width="24" height="8" rx="2" fill="#1A1A1A"/><text x="238" y="132" font-size="10" text-anchor="middle">🔥</text>':''}
+      ${c.decor?.hammock?'<line x1="80" y1="116" x2="160" y2="116" stroke="#8B6355" stroke-width="2.5" opacity=".7"/><path d="M82,116 Q120,132 158,116" fill="#E8A83A" opacity=".7" stroke="#BA7517" stroke-width="1"/>':''}
+      ${c.decor?.bird_feeder?'<rect x="100" y="96" width="3" height="30" fill="#8B6355"/><rect x="90" y="90" width="22" height="14" rx="4" fill="#A1887F"/><text x="101" y="102" font-size="10" text-anchor="middle">🐦</text>':''}
+      <text x="170" y="155" font-size="16" text-anchor="middle">${pet}</text>
+    </svg>`
+  },
+  {
+    id: 'bedroom', name: '🌙 Bedroom',
+    activity: { icon:'🌙', text:'Before sleep tonight: share one thing you are grateful for about each other.' },
+    decor: [
+      {id:'candles',name:'Candles',icon:'🕯️',cost:25},
+      {id:'starlight',name:'Star Lights',icon:'⭐',cost:40},
+      {id:'bookshelf',name:'Bookshelf',icon:'📚',cost:35},
+      {id:'telescope',name:'Telescope',icon:'🔭',cost:60},
+    ],
+    svg: (c,pet) => `<svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">
+      <rect width="340" height="200" fill="${c.wall}" opacity=".85"/>
+      <rect width="340" height="200" fill="#1A237E" opacity=".08"/>
+      <rect y="155" width="340" height="45" fill="${c.floor}"/>
+      <!-- Stars if starlight -->
+      ${c.decor?.starlight?Array.from({length:20},()=>`<circle cx="${Math.floor(Math.random()*340)}" cy="${Math.floor(Math.random()*80)}" r="${Math.random()>0.7?2:1}" fill="#FFE082" opacity="${0.4+Math.random()*0.6}"/>`).join(''):''}
+      <!-- Moon window -->
+      <rect x="220" y="20" width="90" height="70" rx="6" fill="#1A237E" opacity=".15" stroke="#B8958A" stroke-width="1.5"/>
+      <circle cx="280" cy="40" r="16" fill="#FFF9C4" opacity=".8"/>
+      <circle cx="290" cy="34" r="12" fill="${c.wall}" opacity=".6"/>
+      <!-- Bed -->
+      <rect x="60" y="90" width="180" height="70" rx="8" fill="white" opacity=".9" stroke="#E0D0C8" stroke-width="1"/>
+      <rect x="60" y="90" width="180" height="26" rx="8" fill="#B8958A" opacity=".4"/>
+      <rect x="60" y="86" width="180" height="20" rx="6" fill="#8B6355" opacity=".5"/>
+      <rect x="60" y="86" width="24" height="80" rx="6" fill="#8B6355" opacity=".5"/>
+      <rect x="216" y="86" width="24" height="80" rx="6" fill="#8B6355" opacity=".5"/>
+      <ellipse cx="100" cy="108" rx="22" ry="14" fill="white" stroke="#E0D0C8" stroke-width="1"/>
+      <ellipse cx="150" cy="108" rx="22" ry="14" fill="white" stroke="#E0D0C8" stroke-width="1"/>
+      <!-- Nightstands -->
+      <rect x="24" y="118" width="32" height="36" rx="4" fill="#8B6355" opacity=".5"/>
+      <rect x="284" y="118" width="32" height="36" rx="4" fill="#8B6355" opacity=".5"/>
+      ${c.decor?.candles?'<circle cx="40" cy="114" r="4" fill="#FFB300" opacity=".9"/><rect x="38" y="106" width="4" height="12" rx="1" fill="#FFF9C4" opacity=".8"/><circle cx="300" cy="114" r="4" fill="#FFB300" opacity=".9"/><rect x="298" y="106" width="4" height="12" rx="1" fill="#FFF9C4" opacity=".8"/>':''}
+      ${c.decor?.bookshelf?'<rect x="0" y="40" width="52" height="75" rx="3" fill="#8B6355" opacity=".55"/><rect x="0" y="40" width="52" height="8" rx="2" fill="#7A5C52"/>${[0,1,2].map(i=>`<rect x="${4+i*16}" y="${52}" width="${12}" height="${28+i*4}" rx="2" fill="${["#E8735A","#5BA4A4","#E8A83A"][i]}" opacity=".85"/>`).join("")}':''}
+      ${c.decor?.telescope?'<rect x="300" y="95" width="5" height="55" fill="#5D4037" opacity=".7"/><rect x="285" y="88" width="32" height="14" rx="4" fill="#3D2B23" opacity=".8" transform="rotate(-20 301 95)"/>':''}
+      <text x="160" y="158" font-size="16" text-anchor="middle">${pet}</text>
+    </svg>`
+  },
+];
+
+const ROOM_DECOR_DEFAULTS = {wall:'#FFF8F3', floor:'#F5EDE9', sofa:'#E8A83A', decor:{}};
+
+function getRoomColors(){
+  return SS?.room_colors || ROOM_DECOR_DEFAULTS;
+}
+
+function renderNestRooms(){
+  const c = getRoomColors();
+  const pet = document.getElementById('pet-art')?.textContent || '🐣';
+  NEST_ROOMS.forEach(room => {
+    const el = document.getElementById('room-' + room.id);
+    if(el) el.innerHTML = room.svg(c, pet);
+  });
+  renderNestRoom(nestRoomIdx);
+}
+
+function renderNestRoom(idx){
+  nestRoomIdx = idx;
+  const room = NEST_ROOMS[idx];
+  // Update dots
+  const dotsEl = document.getElementById('nest-room-dots');
+  if(dotsEl) dotsEl.innerHTML = NEST_ROOMS.map((r,i)=>
+    `<div style="width:${i===idx?18:7}px;height:7px;border-radius:4px;background:${i===idx?'var(--rose)':'var(--bd2)'};transition:all .3s"></div>`
+  ).join('');
+  // Update name
+  const nameEl = document.getElementById('nest-room-name');
+  if(nameEl) nameEl.textContent = room.name;
+  // Update nav buttons
+  const prev = document.querySelector('.nest-nav-btn:first-child');
+  const next = document.querySelector('.nest-nav-btn:last-child');
+  if(prev) prev.style.opacity = idx===0?'0.3':'1';
+  if(next) next.style.opacity = idx===NEST_ROOMS.length-1?'0.3':'1';
+  // Update activity
+  const promptEl = document.getElementById('nest-room-prompt');
+  if(promptEl) promptEl.innerHTML = `
+    <div style="font-size:28px;flex-shrink:0">${room.activity.icon}</div>
+    <div>
+      <div style="font-size:13px;line-height:1.6;color:var(--text2);font-style:italic">"${room.activity.text}"</div>
+    </div>`;
+  // Update decor shop
+  const shopEl = document.getElementById('nest-decor-shop');
+  const c = getRoomColors();
+  if(shopEl) shopEl.innerHTML = room.decor.map(d=>{
+    const owned = c.decor?.[d.id];
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 10px;border-radius:12px;border:1.5px solid ${owned?'var(--sage)':'var(--bd2)'};background:${owned?'var(--sage-l)':'white'};cursor:pointer;min-width:64px" onclick="${owned?'':'buyDecor(\''+d.id+'\','+d.cost+')'}">
+      <div style="font-size:24px">${d.icon}</div>
+      <div style="font-size:10px;font-weight:700;color:${owned?'var(--sage)':'var(--text3)'}">${d.name}</div>
+      <div style="font-size:10px;font-weight:700;color:${owned?'var(--sage)':'var(--amber)'}">${owned?'✓ Owned':'🪙 '+d.cost}</div>
+    </div>`;
+  }).join('');
+}
+
+function goNestRoom(idx){
+  if(idx<0||idx>=NEST_ROOMS.length) return;
+  nestRoomIdx = idx;
+  renderNestRoom(idx);
+}
+
+async function buyDecor(itemId, cost){
+  if((SS.coins||0)<cost){toast('Not enough coins 🪙');return;}
+  const newColors = getRoomColors();
+  if(!newColors.decor) newColors.decor = {};
+  newColors.decor[itemId] = true;
+  await updateSS({coins:SS.coins-cost, room_colors:newColors});
+  toast('Item added to your nest! ✨');updateBar();renderNestRooms();
+}
+
+function showCustomize(){
+  // Pre-select current colors
+  const c = getRoomColors();
+  document.querySelectorAll('#wall-colors .color-chip').forEach(el=>{el.classList.toggle('on',el.dataset.color===c.wall);});
+  document.querySelectorAll('#floor-colors .color-chip').forEach(el=>{el.classList.toggle('on',el.dataset.color===c.floor);});
+  document.querySelectorAll('#sofa-colors .color-chip').forEach(el=>{el.classList.toggle('on',el.dataset.color===c.sofa);});
+  document.getElementById('modal-customize').classList.remove('hidden');
+}
+
+let customizePicks = {};
+function pickColor(btn, type){
+  btn.closest('.color-row').querySelectorAll('.color-chip').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  customizePicks[type] = btn.dataset.color;
+}
+
+async function saveCustomize(){
+  const c = getRoomColors();
+  const newColors = {...c, ...customizePicks};
+  await updateSS({room_colors: newColors});
+  customizePicks = {};
+  document.getElementById('modal-customize').classList.add('hidden');
+  renderNestRooms();
+  toast('Nest updated! 🏠');
+}
+
+// Swipe support for room navigation
+(function(){
+  let sx=0,sy=0;
+  document.addEventListener('touchstart',e=>{const t=e.target.closest('#nest-rooms-container');if(!t)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
+  document.addEventListener('touchend',e=>{const t=e.target.closest('#nest-rooms-container');if(!t)return;const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)){if(dx<0)goNestRoom(Math.min(nestRoomIdx+1,NEST_ROOMS.length-1));else goNestRoom(Math.max(nestRoomIdx-1,0));}},{passive:true});
+})();
