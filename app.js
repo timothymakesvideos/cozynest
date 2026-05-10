@@ -215,6 +215,7 @@ async function boot(){
 
   } catch(e) {
     console.error('boot failed:', e);
+    _booted = false;
     // Always escape the loading screen
     loading(false);
     g('app-shell').classList.remove('hidden');
@@ -566,8 +567,12 @@ function showModal(id){if(id==='modal-date')g('date-date-inp').value=TODAY();g(i
 function hideModal(id){g(id).classList.add('hidden');}
 function ovClose(e,id){if(e.target.classList.contains('modal-ov'))hideModal(id);}
 
-// BOOT
-db.auth.onAuthStateChange((event,session)=>{if(session){boot();}else{loading(false);showAuth('login');}});
+// BOOT — only run boot on actual sign-in/out events, not token refreshes
+let _booted = false;
+db.auth.onAuthStateChange((event, session) => {
+  if(event === 'SIGNED_OUT'){ _booted = false; loading(false); showAuth('login'); return; }
+  if(session && !_booted){ _booted = true; boot(); }
+});
 
 // ── SERVICE WORKER + PUSH REGISTRATION ───────────────────────
 async function registerPush(){
@@ -807,7 +812,8 @@ const ACTIVITY_SEQUENCES = {
 };
 
 function getSeqState(seqId){
-  return (SS?.activity_sequences || {})[seqId] || null;
+  try{ return (SS?.activity_sequences || {})[seqId] || null; }
+  catch(e){ return null; }
 }
 
 function isUser1(){ return COUPLE?.user1_id === ME?.id; }
@@ -1141,13 +1147,15 @@ function getRoomColors(){
 }
 
 function renderNestRooms(){
-  const c = getRoomColors();
-  const pet = document.getElementById('pet-art')?.textContent || '🐣';
-  NEST_ROOMS.forEach(room => {
-    const el = document.getElementById('room-' + room.id);
-    if(el) el.innerHTML = room.svg(c, pet);
-  });
-  renderNestRoom(nestRoomIdx);
+  try{
+    const c = getRoomColors();
+    const pet = document.getElementById('pet-art')?.textContent || '🐣';
+    NEST_ROOMS.forEach(room => {
+      const el = document.getElementById('room-' + room.id);
+      if(el) el.innerHTML = room.svg(c, pet);
+    });
+    renderNestRoom(nestRoomIdx);
+  } catch(e){ console.warn('renderNestRooms error:', e); }
 }
 
 function renderNestRoom(idx){
