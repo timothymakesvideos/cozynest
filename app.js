@@ -272,25 +272,25 @@ async function earnCoins(n){await updateSS({coins:(SS.coins||0)+n});updateBar();
 
 // ── UI ───────────────────────────────────────────────────────
 async function initUI(){
-  updateBar();
-  updateGreeting();
-  renderHome();
-  renderNest();
-  renderNestRooms();
-  renderNotes();
-  renderDates();
-  renderNestActivity();
-  goTab('home');
-  // Load async data after UI is visible
+  const safe = (fn, name) => { try{ fn(); } catch(e){ console.warn(name+' error:',e); } };
+  safe(()=>updateBar(),        'updateBar');
+  safe(()=>updateGreeting(),   'updateGreeting');
+  safe(()=>renderHome(),       'renderHome');
+  safe(()=>renderNest(),       'renderNest');
+  safe(()=>renderNestRooms(),  'renderNestRooms');
+  safe(()=>renderNotes(),      'renderNotes');
+  safe(()=>renderDates(),      'renderDates');
+  safe(()=>renderNestActivity(),'renderNestActivity');
+  safe(()=>goTab('home'),      'goTab');
   try{ await renderMood(); } catch(e){ console.warn('renderMood error:',e); }
 }
 function updateBar(){g('sc').textContent=(SS?.streak||0)===1?'1 day':(SS?.streak||0)+' days';g('cc').textContent=SS?.coins||0;}
 function updateGreeting(){
   const h=new Date().getHours();
-  g('bn-greet').textContent=h<12?'Good morning ☀️':h<17?'Good afternoon 🌤️':'Good evening 🌙';
+  if(g('bn-greet')) g('bn-greet').textContent=h<12?'Good morning ☀️':h<17?'Good afternoon 🌤️':'Good evening 🌙';
   const days=Math.max(1,Math.floor((Date.now()-new Date(COUPLE.created_at))/86400000)+1);
-  g('bn-day').textContent='Day '+days+' together';
-  g('nest-sub').textContent='Day '+days+' · '+(SS?.streak||0)+' day streak 🔥';
+  if(g('bn-day')) g('bn-day').textContent='Day '+days+' together';
+  if(g('nest-sub')) g('nest-sub').textContent='Day '+days+' · '+(SS?.streak||0)+' day streak 🔥';
 }
 
 // HOME
@@ -383,6 +383,7 @@ async function saveMood(){
 }
 async function renderMood(){
   if(!COUPLE) return;
+  if(!g('pm-e')) return; // mood screen not in DOM yet
   g('pm-e').textContent=P_MOOD?.emoji||'—';
   g('pm-l').textContent=P_MOOD?.label||(PARTNER?'No mood yet':'Waiting for partner...');
   g('pm-n').textContent=P_MOOD?.note?'"'+P_MOOD.note+'"':'';
@@ -482,7 +483,8 @@ async function buyLoc(id){
 
 // NOTES
 function renderNotes(){
-  g('notes-list').innerHTML=NOTES.map(n=>{
+  const el=g('notes-list'); if(!el) return;
+  el.innerHTML=NOTES.map(n=>{
     const mine=n.user_id===ME.id;
     if(n.sticker)return`<div class="nbub sticker ${mine?'me':'p'}" onclick="${mine?`deleteNote('${n.id}')`:''}">${n.sticker}</div>`;
     const t=new Date(n.created_at).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
@@ -527,8 +529,9 @@ function toggleStickers(){
 
 // DATES
 function renderDates(){
+  const el=g('dates-list'); if(!el) return;
   const today=new Date();today.setHours(0,0,0,0);
-  g('dates-list').innerHTML=(DATES||[]).map(d=>{
+  el.innerHTML=(DATES||[]).map(d=>{
     const dt=new Date(d.date+'T00:00:00');
     let next=new Date(dt);next.setFullYear(today.getFullYear());
     if(next<today)next.setFullYear(today.getFullYear()+1);
