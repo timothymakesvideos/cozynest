@@ -1197,7 +1197,6 @@ function renderNestRoom(idx){
   }
   // Update decor shop
   const shopEl = document.getElementById('nest-decor-shop');
-  const c = getRoomColors();
   if(shopEl) shopEl.innerHTML = room.decor.map(d=>{
     const owned = c.decor?.[d.id];
     return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 10px;border-radius:12px;border:1.5px solid ${owned?'var(--sage)':'var(--bd2)'};background:${owned?'var(--sage-l)':'white'};cursor:pointer;min-width:64px" onclick="${owned?'':'buyDecor(\''+d.id+'\','+d.cost+')'}">
