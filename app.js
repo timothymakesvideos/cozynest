@@ -39,10 +39,44 @@ const TIPS=[
 const PLANTS=['🌱','🌿','🍀','🪴','🌺','🌸'];
 const PETS=['🐣','🐥','🐤','🐦','🦜'];
 
+const DAILY_QUESTIONS = [
+  "What's one small thing your partner did recently that you didn't thank them for?",
+  "Describe your partner using only three words — go.",
+  "What's a memory from early in your relationship that still makes you smile?",
+  "What's something you'd love to do together that you haven't tried yet?",
+  "What's one thing your partner does that always cheers you up?",
+  "If you could relive one day together, which would it be and why?",
+  "What's something you've learned about yourself through this relationship?",
+  "What's your favourite thing about your partner that they might not know?",
+  "What's a dream or goal you want to work toward together?",
+  "How do you want your partner to feel every single day?",
+  "What's one way your partner makes ordinary moments feel special?",
+  "If you wrote your partner a letter they'd read in 10 years, what would it say?",
+  "What song reminds you of your partner and why?",
+  "When do you feel most loved by your partner?",
+  "What's something you want to get better at for your relationship?",
+  "What's a little ritual or habit you two share that you love?",
+  "What's one thing you wish you could do more of together?",
+  "What part of your partner's personality do you find most admirable?",
+  "What does your ideal lazy day together look like?",
+  "What's something your partner taught you that changed how you see the world?",
+  "How has your partner helped you grow as a person?",
+  "What's a challenge you've faced together that made you stronger?",
+  "What's the most thoughtful thing your partner has ever done for you?",
+  "What's something small you could do tomorrow to make your partner smile?",
+  "If you could give your relationship a title like a movie, what would it be?",
+  "What's one boundary or need you feel safe expressing to your partner?",
+  "What's something your partner does that you hope they never stop doing?",
+  "What's a place you'd love to explore together someday?",
+  "What's one thing you appreciate about how your partner handles hard times?",
+  "How would you describe your relationship to someone who's never met you both?",
+];
+
 // ── IN-MEMORY STATE ──────────────────────────────────────────
 let ME=null,PARTNER=null,COUPLE=null,SS=null;
 let MY_MOOD=null,P_MOOD=null,NOTES=[],DATES=[],CUSTOM_ACTS=[],ACT_DONE_TODAY=[];
 let REALTIME_CH=null;
+let TODAY_QUESTION=null, MY_Q_ANSWER=null, PARTNER_Q_ANSWER=null;
 
 // ── UTIL ─────────────────────────────────────────────────────
 function hsh(s){let h=0;for(let i=0;i<s.length;i++)h=(Math.imul(31,h)+s.charCodeAt(i))|0;return h;}
@@ -188,12 +222,13 @@ async function boot(){
     console.log('boot: shared_state loaded', !!SS);
 
     // Step 7: All other data
-    const [moodsRes, notesRes, datesRes, caRes, doneRes] = await Promise.all([
+    const [moodsRes, notesRes, datesRes, caRes, doneRes, qRes] = await Promise.all([
       db.from('moods').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:false}).limit(30),
       db.from('notes').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:true}).limit(60),
       db.from('special_dates').select('*').eq('couple_id',COUPLE.id).order('date',{ascending:true}),
       db.from('custom_activities').select('*').eq('couple_id',COUPLE.id),
       db.from('activities').select('act_id').eq('couple_id',COUPLE.id).eq('user_id',ME.id).eq('act_date',TODAY()),
+      db.from('daily_question_answers').select('*').eq('couple_id',COUPLE.id).eq('question_date',TODAY()),
     ]);
     const moods = moodsRes.data||[];
     MY_MOOD  = moods.find(m=>m.user_id===ME.id)||null;
@@ -202,6 +237,12 @@ async function boot(){
     DATES    = datesRes.data||[];
     CUSTOM_ACTS   = caRes.data||[];
     ACT_DONE_TODAY= (doneRes.data||[]).map(r=>r.act_id);
+    // Daily question
+    const qIdx = Math.floor(new Date(TODAY()).getTime()/86400000) % DAILY_QUESTIONS.length;
+    TODAY_QUESTION = DAILY_QUESTIONS[qIdx];
+    const qAnswers = qRes.data||[];
+    MY_Q_ANSWER = qAnswers.find(a=>a.user_id===ME.id)||null;
+    PARTNER_Q_ANSWER = qAnswers.find(a=>a.user_id!==ME.id)||null;
     console.log('boot: all data loaded');
 
     // Step 8: Show app
@@ -246,6 +287,9 @@ function subscribeRT(){
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes',filter:`couple_id=eq.${COUPLE.id}`},p=>{
       if(p.new.user_id!==ME.id){NOTES.push(p.new);renderNotes();}
     })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'daily_question_answers',filter:`couple_id=eq.${COUPLE.id}`},p=>{
+      if(p.new.user_id!==ME.id){PARTNER_Q_ANSWER=p.new;renderDailyQuestion();toast((PARTNER?.name||'Partner')+' answered today\'s question 💬');}
+    })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'couples',filter:`id=eq.${COUPLE.id}`},async p=>{
       // Partner just joined — load their profile
       COUPLE=p.new;
@@ -276,6 +320,7 @@ async function initUI(){
   safe(()=>updateBar(),        'updateBar');
   safe(()=>updateGreeting(),   'updateGreeting');
   safe(()=>renderHome(),       'renderHome');
+  safe(()=>renderDailyQuestion(),'renderDailyQuestion');
   safe(()=>renderNest(),       'renderNest');
   safe(()=>renderNestRooms(),  'renderNestRooms');
   safe(()=>renderNotes(),      'renderNotes');
@@ -317,6 +362,52 @@ function renderHome(){
   }).join('');
   g('daily-tip').textContent=TIPS[new Date().getDay()%TIPS.length];
 }
+// ── DAILY QUESTION ──────────────────────────────────────────
+function renderDailyQuestion(){
+  const card = g('daily-question-card');
+  if(!card||!TODAY_QUESTION) return;
+  const answered = !!MY_Q_ANSWER;
+  const partnerAnswered = !!PARTNER_Q_ANSWER;
+  const partnerName = PARTNER?.name||'Partner';
+
+  let html = `<div style="font-family:'Lora',serif;font-size:14px;font-style:italic;color:var(--text);line-height:1.6;margin-bottom:12px">"${TODAY_QUESTION}"</div>`;
+
+  if(!answered){
+    html += `<textarea id="dq-inp" class="mood-note-area" style="height:72px" placeholder="Write your answer... (your partner sees it after they answer too)"></textarea>
+    <button class="btn-save" style="margin-top:8px" onclick="saveDailyAnswer()">Share my answer 💬 · +8 🪙</button>`;
+  } else {
+    html += `<div style="background:var(--rose-l);border-radius:var(--rsm);padding:10px 12px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--rose);margin-bottom:4px">Your answer</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.5">${MY_Q_ANSWER.answer}</div>
+    </div>`;
+    if(partnerAnswered){
+      html += `<div style="background:var(--teal-l);border-radius:var(--rsm);padding:10px 12px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--teal);margin-bottom:4px">${partnerName}'s answer</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.5">${PARTNER_Q_ANSWER.answer}</div>
+      </div>`;
+    } else {
+      html += `<div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">⏳ Waiting for ${partnerName} to answer...</div>`;
+    }
+  }
+  card.innerHTML = `<div class="ctitle">💬 Today's question</div>${html}`;
+}
+
+async function saveDailyAnswer(){
+  const inp = g('dq-inp');
+  const answer = inp?.value?.trim();
+  if(!answer){ toast('Write something first 💬'); return; }
+  const {data, error} = await db.from('daily_question_answers')
+    .insert({couple_id:COUPLE.id, user_id:ME.id, answer, question_date:TODAY(), question:TODAY_QUESTION})
+    .select().single();
+  if(error){ toast('Error saving: '+error.message); return; }
+  MY_Q_ANSWER = data;
+  await earnCoins(8);
+  await tryStreak();
+  sendPushNotification('note', (ME?.name||'You')+' answered today\'s question — your turn!');
+  renderDailyQuestion();
+  toast('Answer shared! +8 🪙 💬');
+}
+
 async function doAct(id,coins){
   if(ACT_DONE_TODAY.includes(id))return;
   const act=[...pickPool(TODAY()),...CUSTOM_ACTS].find(a=>a.id===id);
@@ -411,6 +502,7 @@ async function renderMood(){
     .select('*').eq('couple_id',COUPLE.id)
     .order('created_at',{ascending:false}).limit(14);
   const hist=g('mhist');
+  if(!hist) return;
   if(!moods||moods.length===0){hist.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0">No mood history yet — start sharing!</div>';return;}
   hist.innerHTML=moods.map(m=>{
     const mine=m.user_id===ME.id;
