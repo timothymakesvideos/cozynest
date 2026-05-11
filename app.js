@@ -210,6 +210,8 @@ async function boot(){
       const {data:partner} = await db.from('profiles').select('*').eq('id',pid).single();
       PARTNER = partner||null;
       console.log('boot: partner', PARTNER?.name);
+    } else {
+      PARTNER = null;
     }
 
     // Step 6: Shared state
@@ -286,6 +288,19 @@ function subscribeRT(){
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes',filter:`couple_id=eq.${COUPLE.id}`},p=>{
       if(p.new.user_id!==ME.id){NOTES.push(p.new);renderNotes();}
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'couples',filter:`id=eq.${COUPLE.id}`},async p=>{
+      COUPLE=p.new;
+      // If partner just joined, load their profile
+      if(!PARTNER){
+        const pid=COUPLE.user1_id===ME.id?COUPLE.user2_id:COUPLE.user1_id;
+        if(pid){
+          const{data:partner}=await db.from('profiles').select('*').eq('id',pid).single();
+          PARTNER=partner||null;
+          renderHome();renderMood();renderDailyQuestion();
+          toast((PARTNER?.name||'Your partner')+' joined the nest! 💛');
+        }
+      }
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'daily_question_answers',filter:`couple_id=eq.${COUPLE.id}`},p=>{
       if(p.new.user_id!==ME.id){PARTNER_Q_ANSWER=p.new;renderDailyQuestion();toast((PARTNER?.name||'Partner')+' answered today\'s question 💬');}
@@ -497,14 +512,23 @@ async function renderMood(){
   g('pm-sug').textContent="Your partner hasn't shared their mood yet today.";
   }
 
-  // Load mood history — last 14 days for meaningful analysis
+  // Get Monday of current week
+  const now=new Date();
+  const dayOfWeek=now.getDay()===0?6:now.getDay()-1; // Mon=0, Sun=6
+  const weekStart=new Date(now);
+  weekStart.setDate(now.getDate()-dayOfWeek);
+  weekStart.setHours(0,0,0,0);
+  const weekStartISO=weekStart.toISOString();
+
+  // Load this week's moods only
   const{data:moods}=await db.from('moods')
     .select('*').eq('couple_id',COUPLE.id)
-    .order('created_at',{ascending:false}).limit(60);
+    .gte('created_at',weekStartISO)
+    .order('created_at',{ascending:false});
   const hist=g('mhist');
   if(!hist) return;
   if(!moods||moods.length===0){
-    hist.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;text-align:center">No mood history yet — start sharing! 💬</div>';
+    hist.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;text-align:center">No moods logged this week yet — start sharing! 💬</div>';
     return;
   }
 
