@@ -223,15 +223,22 @@ async function boot(){
     SS = ss;
     console.log('boot: shared_state loaded', !!SS);
 
-    // Step 7: All other data
+    // Step 7: All other data — wrap each in timeout so one bad query can't hang forever
+    const safe7 = (p) => Promise.race([p, new Promise(r=>setTimeout(()=>r({data:null,error:'timeout'}),8000))]);
     const [moodsRes, notesRes, datesRes, caRes, doneRes, qRes] = await Promise.all([
-      db.from('moods').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:false}).limit(30),
-      db.from('notes').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:true}).limit(60),
-      db.from('special_dates').select('*').eq('couple_id',COUPLE.id).order('date',{ascending:true}),
-      db.from('custom_activities').select('*').eq('couple_id',COUPLE.id),
-      db.from('activities').select('act_id').eq('couple_id',COUPLE.id).eq('user_id',ME.id).eq('act_date',TODAY()),
-      db.from('daily_question_answers').select('*').eq('couple_id',COUPLE.id).eq('question_date',TODAY()),
+      safe7(db.from('moods').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:false}).limit(30)),
+      safe7(db.from('notes').select('*').eq('couple_id',COUPLE.id).order('created_at',{ascending:true}).limit(60)),
+      safe7(db.from('special_dates').select('*').eq('couple_id',COUPLE.id).order('date',{ascending:true})),
+      safe7(db.from('custom_activities').select('*').eq('couple_id',COUPLE.id)),
+      safe7(db.from('activities').select('act_id').eq('couple_id',COUPLE.id).eq('user_id',ME.id).eq('act_date',TODAY())),
+      safe7(db.from('daily_question_answers').select('*').eq('couple_id',COUPLE.id).eq('question_date',TODAY())),
     ]);
+    if(moodsRes.error) console.warn('moods error:', moodsRes.error);
+    if(notesRes.error) console.warn('notes error:', notesRes.error);
+    if(datesRes.error) console.warn('dates error:', datesRes.error);
+    if(caRes.error)    console.warn('custom_acts error:', caRes.error);
+    if(doneRes.error)  console.warn('activities error:', doneRes.error);
+    if(qRes.error)     console.warn('daily_q error:', qRes.error);
     const moods = moodsRes.data||[];
     MY_MOOD  = moods.find(m=>m.user_id===ME.id)||null;
     P_MOOD   = moods.find(m=>m.user_id!==ME.id)||null;
@@ -259,12 +266,32 @@ async function boot(){
   } catch(e) {
     console.error('boot failed:', e);
     _booted = false;
-    // Always escape the loading screen
     loading(false);
-    g('app-shell').classList.remove('hidden');
-    toast('Something went wrong — please refresh');
+    // If we have enough state to show the app, show it
+    if(ME && COUPLE && SS){
+      g('app-shell').classList.remove('hidden');
+      try{ goTab('home'); }catch(_){}
+      toast('Something went wrong loading — some data may be missing');
+    } else {
+      // Not enough state — go back to auth
+      showAuth('login');
+    }
   }
 }
+
+// Hard escape: if still on loading screen after 12s, something silently failed
+setTimeout(()=>{
+  if(!g('loading-screen').classList.contains('hidden')){
+    console.warn('Loading timeout — forcing escape');
+    loading(false);
+    if(ME && COUPLE && SS){
+      g('app-shell').classList.remove('hidden');
+      try{ goTab('home'); }catch(_){}
+    } else {
+      showAuth('login');
+    }
+  }
+}, 12000);
 
 // ── REALTIME ─────────────────────────────────────────────────
 function subscribeRT(){
