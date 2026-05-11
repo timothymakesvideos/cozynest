@@ -64,6 +64,7 @@
 <!-- HOME -->
 <div class="screen hidden" id="s-home">
   <div class="banner"><div class="banner-day" id="bn-day">Day 1 together</div><div class="banner-h" id="bn-greet">Good morning ☀️</div></div>
+  <div class="card" style="padding:10px 14px" id="streak-progress-card"><div id="streak-progress"></div></div>
   <div class="pcards">
     <div class="pcard"><div class="pcard-who">You</div><div class="pcard-av" id="hav-me" style="background:var(--rose-l)">🐻</div><div class="pcard-name" id="hn-me">You</div><div class="pcard-mood" id="hm-me">—</div><div class="pcard-note" id="hnote-me">No mood yet</div></div>
     <div class="pcard"><div class="pcard-who">Partner</div><div class="pcard-av" id="hav-p" style="background:var(--teal-l)">🐱</div><div class="pcard-name" id="hn-p">Partner</div><div class="pcard-mood" id="hm-p">—</div><div class="pcard-note" id="hnote-p">Waiting...</div></div>
@@ -360,6 +361,18 @@
     <button class="btn-cancel" style="margin-top:8px" onclick="hideModal('modal-sequence')">Close</button>
   </div>
 </div>
+<!-- CONFETTI CANVAS -->
+<canvas id="confetti-canvas" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999"></canvas>
+
+<!-- MODAL: STREAK REWARD -->
+<div class="modal-ov hidden" id="modal-streak-reward" onclick="ovClose(event,'modal-streak-reward')">
+  <div class="modal-sh" style="text-align:center">
+    <div class="modal-handle"></div>
+    <div id="streak-reward-body"></div>
+    <button class="btn-save" style="margin-top:4px" onclick="hideModal('modal-streak-reward')">Claim reward 🎉</button>
+  </div>
+</div>
+
 </div><!-- /app-shell -->
 <script src="config.js"></script>
 <script src="app.js"></script>

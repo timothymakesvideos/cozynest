@@ -352,11 +352,118 @@ async function updateSS(patch){
   Object.assign(SS,patch);
   await db.from('shared_state').update({...patch,updated_at:new Date().toISOString()}).eq('couple_id',COUPLE.id);
 }
+// ── STREAK REWARDS ───────────────────────────────────────────
+const STREAK_REWARDS = [
+  { days:7,   coins:50,  icon:'🌟', title:'One week together!',    desc:'You\'ve shown up for each other every day this week. Here\'s 50 bonus coins — spend them on your nest.',  decor:null },
+  { days:14,  coins:100, icon:'💫', title:'Two weeks strong!',     desc:'Two weeks of daily connection. That\'s not nothing — that\'s everything. +100 coins.',                    decor:null },
+  { days:30,  coins:200, icon:'🏆', title:'One month streak!',     desc:'A whole month. Pebble is glowing. +200 coins and a new nest decoration unlocked.',                        decor:'🌙' },
+  { days:60,  coins:350, icon:'💎', title:'60 days of love!',      desc:'Sixty days. You two are building something real. +350 coins and a golden decoration unlocked.',           decor:'⭐' },
+  { days:100, coins:500, icon:'👑', title:'100 day milestone!',    desc:'One hundred days. Legendary. +500 coins and the rarest nest decoration unlocked.',                       decor:'🔮' },
+];
+
 async function tryStreak(){
   const t=TODAY();if(SS.last_streak_date===t)return;
   const y=new Date(Date.now()-86400000).toISOString().split('T')[0];
-  await updateSS({streak:SS.last_streak_date===y?(SS.streak||0)+1:1,last_streak_date:t});
+  const newStreak=SS.last_streak_date===y?(SS.streak||0)+1:1;
+  await updateSS({streak:newStreak,last_streak_date:t});
+  await checkStreakReward(newStreak);
 }
+
+async function checkStreakReward(streak){
+  const reward=STREAK_REWARDS.find(r=>r.days===streak);
+  if(!reward) return;
+  // Check if already claimed (stored in SS.claimed_rewards array)
+  const claimed=SS.claimed_rewards||[];
+  if(claimed.includes(reward.days)) return;
+  // Award coins
+  await earnCoins(reward.coins);
+  // Mark as claimed
+  const newClaimed=[...claimed,reward.days];
+  const patch={claimed_rewards:newClaimed};
+  // Unlock decor if applicable
+  if(reward.decor){
+    const decor=SS.room_colors?.decor||{};
+    const decorKey='streak_'+reward.days;
+    patch.room_colors={...(SS.room_colors||{}),decor:{...decor,[decorKey]:reward.decor}};
+  }
+  await updateSS(patch);
+  // Show celebration modal
+  showStreakReward(reward);
+}
+
+function showStreakReward(reward){
+  const modal=g('modal-streak-reward');
+  const body=g('streak-reward-body');
+  if(!modal||!body) return;
+  body.innerHTML=`
+    <div style="font-size:56px;text-align:center;margin-bottom:8px;animation:streakPop .5s cubic-bezier(.34,1.56,.64,1) both">${reward.icon}</div>
+    <div style="font-family:'Lora',serif;font-size:19px;font-weight:700;text-align:center;color:var(--text);margin-bottom:8px">${reward.title}</div>
+    <div style="font-size:13px;color:var(--text2);text-align:center;line-height:1.6;margin-bottom:16px">${reward.desc}</div>
+    <div style="display:flex;justify-content:center;align-items:center;gap:8px;background:var(--amber-l);border-radius:var(--rpill);padding:10px 20px;margin-bottom:16px;width:fit-content;margin-left:auto;margin-right:auto">
+      <span style="font-size:22px">🪙</span>
+      <span style="font-size:18px;font-weight:700;color:var(--amber)">+${reward.coins} coins</span>
+    </div>
+    ${reward.decor?`<div style="text-align:center;font-size:12px;color:var(--text3);margin-bottom:14px">New nest decoration unlocked: ${reward.decor}</div>`:''}
+    <div style="display:flex;justify-content:center;gap:8px">
+      <div style="font-size:11px;color:var(--text3);text-align:center">🔥 ${reward.days} day streak</div>
+    </div>`;
+  // Confetti burst
+  launchConfetti();
+  modal.classList.remove('hidden');
+}
+
+function launchConfetti(){
+  const canvas=g('confetti-canvas');
+  if(!canvas) return;
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+  canvas.style.display='block';
+  const ctx=canvas.getContext('2d');
+  const pieces=Array.from({length:80},()=>({
+    x:Math.random()*canvas.width,
+    y:-10-Math.random()*40,
+    r:4+Math.random()*4,
+    color:['#E8735A','#5BA4A4','#E8A83A','#7BA68A','#8B6355','#F5A48B'][Math.floor(Math.random()*6)],
+    vx:(Math.random()-0.5)*3,
+    vy:2+Math.random()*3,
+    rot:Math.random()*360,
+    rspeed:(Math.random()-0.5)*6,
+  }));
+  let frame=0;
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    pieces.forEach(p=>{
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot*Math.PI/180);
+      ctx.fillStyle=p.color;ctx.fillRect(-p.r,-p.r,p.r*2,p.r*2);
+      ctx.restore();
+      p.x+=p.vx;p.y+=p.vy;p.rot+=p.rspeed;p.vy+=0.05;
+    });
+    frame++;
+    if(frame<120) requestAnimationFrame(draw);
+    else{ctx.clearRect(0,0,canvas.width,canvas.height);canvas.style.display='none';}
+  }
+  draw();
+}
+
+function renderStreakProgress(){
+  const el=g('streak-progress');if(!el) return;
+  const card=g('streak-progress-card');
+  const streak=SS?.streak||0;
+  const claimed=SS?.claimed_rewards||[];
+  const next=STREAK_REWARDS.find(r=>!claimed.includes(r.days)&&r.days>streak);
+  if(!next){el.innerHTML='';if(card)card.style.display='none';return;}
+  if(card)card.style.display='';
+  const pct=Math.min(100,Math.round((streak/next.days)*100));
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+    <div style="font-size:11px;color:var(--text3)">Next reward at ${next.days} days ${next.icon}</div>
+    <div style="font-size:11px;font-weight:700;color:var(--amber)">🔥 ${streak}/${next.days}</div>
+  </div>
+  <div style="height:5px;background:var(--bd);border-radius:3px;overflow:hidden">
+    <div style="height:100%;width:${pct}%;background:var(--amber);border-radius:3px;transition:width .6s ease"></div>
+  </div>`;
+}
+
+
 async function earnCoins(n){await updateSS({coins:(SS.coins||0)+n});updateBar();coinPop(n);}
 
 // ── UI ───────────────────────────────────────────────────────
@@ -365,6 +472,7 @@ async function initUI(){
   safe(()=>updateBar(),        'updateBar');
   safe(()=>updateGreeting(),   'updateGreeting');
   safe(()=>renderHome(),       'renderHome');
+  safe(()=>renderStreakProgress(),'renderStreakProgress');
   safe(()=>renderDailyQuestion(),'renderDailyQuestion');
   safe(()=>renderNest(),       'renderNest');
   safe(()=>renderNestRooms(),  'renderNestRooms');
@@ -374,7 +482,11 @@ async function initUI(){
   safe(()=>goTab('home'),      'goTab');
   try{ await renderMood(); } catch(e){ console.warn('renderMood error:',e); }
 }
-function updateBar(){g('sc').textContent=(SS?.streak||0)===1?'1 day':(SS?.streak||0)+' days';g('cc').textContent=SS?.coins||0;}
+function updateBar(){
+  g('sc').textContent=(SS?.streak||0)===1?'1 day':(SS?.streak||0)+' days';
+  g('cc').textContent=SS?.coins||0;
+  renderStreakProgress();
+}
 function updateGreeting(){
   const h=new Date().getHours();
   if(g('bn-greet')) g('bn-greet').textContent=h<12?'Good morning ☀️':h<17?'Good afternoon 🌤️':'Good evening 🌙';
