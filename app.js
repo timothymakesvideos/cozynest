@@ -503,8 +503,87 @@ async function renderMood(){
     .order('created_at',{ascending:false}).limit(14);
   const hist=g('mhist');
   if(!hist) return;
-  if(!moods||moods.length===0){hist.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0">No mood history yet — start sharing!</div>';return;}
-  hist.innerHTML=moods.map(m=>{
+  if(!moods||moods.length===0){
+    hist.innerHTML='<div style="font-size:13px;color:var(--text3);padding:8px 0;text-align:center">No mood history yet — start sharing! 💬</div>';
+    return;
+  }
+
+  // Mood → numeric score (1–5)
+  const SCORE={'😄':5,'😊':4.5,'🥰':5,'😌':4,'🤩':5,'😎':4,'🥳':5,'😴':2,'😐':2.5,'🤔':3,'😰':1.5,'😤':1.5,'😔':1.5,'😢':1,'😡':1,'🤒':1.5};
+
+  // Build last 7 days array
+  const days7=Array.from({length:7},(_,i)=>{
+    const d=new Date(); d.setDate(d.getDate()-(6-i));
+    return d.toISOString().split('T')[0];
+  });
+
+  const getScore=(uid,date)=>{
+    const m=moods.find(x=>x.user_id===uid&&x.created_at.startsWith(date));
+    return m ? (SCORE[m.emoji]||3) : null;
+  };
+
+  const meScores  = days7.map(d=>getScore(ME.id,d));
+  const pScores   = PARTNER ? days7.map(d=>getScore(PARTNER.id,d)) : [];
+  const hasAnyMe  = meScores.some(s=>s!==null);
+  const hasAnyP   = pScores.some(s=>s!==null);
+
+  // SVG dimensions
+  const W=320,H=80,PX=16,PY=8;
+  const toX=i=>PX+(W-PX*2)*(i/6);
+  const toY=s=>PY+(H-PY*2)*(1-(s-1)/4);
+
+  const buildLine=(scores,stroke)=>{
+    const pts=scores.map((s,i)=>s!==null?{x:toX(i),y:toY(s)}:null);
+    const visible=pts.filter(Boolean);
+    if(!visible.length) return '';
+    // smooth curve through points
+    let path='';
+    const connected=[];
+    pts.forEach((p,i)=>{ if(p) connected.push({...p,i}); });
+    if(connected.length===1){
+      return `<circle cx="${connected[0].x}" cy="${connected[0].y}" r="4" fill="${stroke}" opacity=".9"/>`;
+    }
+    let d=`M${connected[0].x},${connected[0].y}`;
+    for(let k=1;k<connected.length;k++){
+      const a=connected[k-1],b=connected[k];
+      const cx=(a.x+b.x)/2;
+      d+=` C${cx},${a.y} ${cx},${b.y} ${b.x},${b.y}`;
+    }
+    return `
+      <path d="${d}" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+      ${connected.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${stroke}" stroke="white" stroke-width="1.5" opacity=".95"/>`).join('')}`;
+  };
+
+  // Day labels
+  const labels=days7.map((d,i)=>{
+    const lbl=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'narrow'});
+    return `<text x="${toX(i)}" y="${H+12}" font-size="9.5" text-anchor="middle" fill="var(--text3)" font-family="Nunito,sans-serif">${lbl}</text>`;
+  }).join('');
+
+  // Horizontal guide lines
+  const guides=[1,2.5,4].map(s=>`<line x1="${PX}" y1="${toY(s)}" x2="${W-PX}" y2="${toY(s)}" stroke="var(--bd)" stroke-width="1" stroke-dasharray="3,4"/>`).join('');
+
+  const svg=`<svg viewBox="0 0 ${W} ${H+18}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible;margin-bottom:2px">
+    ${guides}
+    ${hasAnyMe  ? buildLine(meScores, 'var(--rose)') : ''}
+    ${hasAnyP   ? buildLine(pScores,  'var(--teal)') : ''}
+    ${labels}
+  </svg>`;
+
+  // Legend
+  const legend=`<div style="display:flex;gap:14px;margin-bottom:12px;padding:0 2px">
+    ${hasAnyMe?`<div style="display:flex;align-items:center;gap:5px">
+      <div style="width:22px;height:3px;border-radius:2px;background:var(--rose)"></div>
+      <span style="font-size:11px;color:var(--text3)">${ME?.name||'You'}</span>
+    </div>`:''}
+    ${hasAnyP?`<div style="display:flex;align-items:center;gap:5px">
+      <div style="width:22px;height:3px;border-radius:2px;background:var(--teal)"></div>
+      <span style="font-size:11px;color:var(--text3)">${PARTNER?.name||'Partner'}</span>
+    </div>`:''}
+  </div>`;
+
+  // Recent mood rows (last 5)
+  const rows=moods.slice(0,5).map(m=>{
     const mine=m.user_id===ME.id;
     const who=mine?(ME?.name||'You'):(PARTNER?.name||'Partner');
     const dt=new Date(m.created_at).toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
@@ -514,6 +593,8 @@ async function renderMood(){
       <div class="mhtime">${dt}</div>
     </div>`;
   }).join('');
+
+  hist.innerHTML = svg + legend + rows;
 }
 
 // NEST
