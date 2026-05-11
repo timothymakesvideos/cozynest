@@ -204,14 +204,17 @@ async function boot(){
     if(coupleErr||!couple){ loading(false); showCouple(); return; }
     COUPLE = couple;
 
-    // Step 5: Partner (optional — may not have joined yet)
+    // Step 5: Partner — try user1/user2 first, fallback to querying by couple_id
     const pid = couple.user1_id===ME.id ? couple.user2_id : couple.user1_id;
     if(pid){
       const {data:partner} = await db.from('profiles').select('*').eq('id',pid).single();
       PARTNER = partner||null;
-      console.log('boot: partner', PARTNER?.name);
+      console.log('boot: partner via pid', PARTNER?.name);
     } else {
-      PARTNER = null;
+      // Fallback: find the other profile linked to this couple
+      const {data:others} = await db.from('profiles').select('*').eq('couple_id',COUPLE.id).neq('id',ME.id);
+      PARTNER = others?.[0]||null;
+      console.log('boot: partner via couple_id fallback', PARTNER?.name);
     }
 
     // Step 6: Shared state
@@ -625,7 +628,10 @@ async function renderMood(){
   };
 
   const meAnalysis = buildAnalysis(ME.id, moods);
-  const pAnalysis  = PARTNER ? buildAnalysis(PARTNER.id, moods) : null;
+  // Find partner id from moods themselves if PARTNER is somehow null
+  const partnerId = PARTNER?.id || moods.find(m=>m.user_id!==ME.id)?.user_id || null;
+  const pAnalysis  = partnerId ? buildAnalysis(partnerId, moods) : null;
+  const partnerName = PARTNER?.name || 'Partner';
 
   // Render one analysis block
   const renderBlock=(analysis, name, accentColor, insight)=>{
@@ -657,13 +663,13 @@ async function renderMood(){
 
   const myInsight = meAnalysis ? (INSIGHTS_ME[meAnalysis.dominant]||'Keep sharing your mood daily 💛') : '';
   const pInsight  = pAnalysis  ? (typeof INSIGHTS_PARTNER[pAnalysis.dominant]==='function'
-    ? INSIGHTS_PARTNER[pAnalysis.dominant](PARTNER?.name||'Partner')
-    : `${PARTNER?.name||'Partner'} has been feeling ${pAnalysis.dominant.toLowerCase()} lately.`) : '';
+    ? INSIGHTS_PARTNER[pAnalysis.dominant](partnerName)
+    : `${partnerName} has been feeling ${pAnalysis.dominant.toLowerCase()} lately.`) : '';
 
   hist.innerHTML =
     renderBlock(meAnalysis, ME?.name||'You', 'var(--rose)', myInsight) +
     (pAnalysis ? `<div style="height:1px;background:var(--bd);margin-bottom:14px"></div>` : '') +
-    renderBlock(pAnalysis, PARTNER?.name||'Partner', 'var(--teal)', pInsight);
+    renderBlock(pAnalysis, partnerName, 'var(--teal)', pInsight);
 }
 
 // NEST
@@ -682,9 +688,13 @@ async function waterPlant(){
 function renderNest(){
   if(!SS)return;
   const{pet_love:pl=60,pet_happy:ph=75,pet_health:phl=50,plant_progress:pp=20}=SS;
-  ['love','happy','health'].forEach((k,i)=>{const v=[pl,ph,phl][i];g('st-'+k).style.width=v+'%';g('st-'+k+'-n').textContent=v+'%';});
+  // Guard all elements — nest screen may not be visible
+  const se=(id,val,prop='textContent')=>{const el=g(id);if(el)el[prop]=val;};
+  const sw=(id,val)=>{const el=g(id);if(el)el.style.width=val;};
+  ['love','happy','health'].forEach((k,i)=>{const v=[pl,ph,phl][i];sw('st-'+k,v+'%');se('st-'+k+'-n',v+'%');});
   const ptl=Math.min(Math.floor((pl+ph+phl)/(300/PETS.length)),PETS.length-1);
-  g('pet-art').textContent=PETS[ptl];g('pet-in-room').textContent=PETS[ptl];
+  se('pet-art',PETS[ptl]);
+  se('pet-in-room',PETS[ptl]);
   const iU1=COUPLE?.user1_id===ME?.id;
   const myFedField=iU1?'pet_fed_user1':'pet_fed_user2';
   const pFedField =iU1?'pet_fed_user2':'pet_fed_user1';
@@ -692,17 +702,17 @@ function renderNest(){
   const pWatField =iU1?'plant_wat_user2':'plant_wat_user1';
   const fed=(SS[myFedField]||'')===TODAY();
   const pFed=(SS[pFedField]||'')===TODAY();
-  g('feed-btn').disabled=fed;g('feed-btn').style.opacity=fed?.5:1;
-  g('pet-fed-badge').textContent=fed?'You fed Pebble ✓':(pFed?(PARTNER?.name||'Partner')+' fed Pebble ✓':'');
-  g('pet-lim').textContent=fed?'You already fed Pebble today':(pFed?'You can still feed Pebble today!':'Both of you can feed once per day');
+  const feedBtn=g('feed-btn');if(feedBtn){feedBtn.disabled=fed;feedBtn.style.opacity=fed?.5:1;}
+  se('pet-fed-badge',fed?'You fed Pebble ✓':(pFed?(PARTNER?.name||'Partner')+' fed Pebble ✓':''));
+  se('pet-lim',fed?'You already fed Pebble today':(pFed?'You can still feed Pebble today!':'Both of you can feed once per day'));
   const lvl=Math.min(Math.floor(pp/20),PLANTS.length-1);
-  g('plant-art').textContent=PLANTS[lvl];g('plant-bar').style.width=pp+'%';
-  g('plant-lbl').textContent=['Seedling','Sprout','Sapling','Young plant','Blooming','In full bloom'][lvl]+' · '+Math.round(pp)+'% grown';
+  se('plant-art',PLANTS[lvl]);sw('plant-bar',pp+'%');
+  se('plant-lbl',['Seedling','Sprout','Sapling','Young plant','Blooming','In full bloom'][lvl]+' · '+Math.round(pp)+'% grown');
   const wat=(SS[myWatField]||'')===TODAY();
   const pWat=(SS[pWatField]||'')===TODAY();
-  g('water-btn').disabled=wat;g('water-btn').style.opacity=wat?.5:1;
-  g('plant-watered-badge').textContent=wat?'You watered Sprout 💧':(pWat?(PARTNER?.name||'Partner')+' watered Sprout 💧':'');
-  g('plant-lim').textContent=wat?'You already watered Sprout today':(pWat?'You can still water Sprout today!':'Both of you can water once per day');
+  const waterBtn=g('water-btn');if(waterBtn){waterBtn.disabled=wat;waterBtn.style.opacity=wat?.5:1;}
+  se('plant-watered-badge',wat?'You watered Sprout 💧':(pWat?(PARTNER?.name||'Partner')+' watered Sprout 💧':''));
+  se('plant-lim',wat?'You already watered Sprout today':(pWat?'You can still water Sprout today!':'Both of you can water once per day'));
 }
 
 // CITY buy
