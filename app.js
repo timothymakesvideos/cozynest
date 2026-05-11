@@ -497,10 +497,10 @@ async function renderMood(){
   g('pm-sug').textContent="Your partner hasn't shared their mood yet today.";
   }
 
-  // Load real mood history from DB
+  // Load mood history — last 14 days for meaningful analysis
   const{data:moods}=await db.from('moods')
     .select('*').eq('couple_id',COUPLE.id)
-    .order('created_at',{ascending:false}).limit(14);
+    .order('created_at',{ascending:false}).limit(60);
   const hist=g('mhist');
   if(!hist) return;
   if(!moods||moods.length===0){
@@ -508,93 +508,111 @@ async function renderMood(){
     return;
   }
 
-  // Mood → numeric score (1–5)
-  const SCORE={'😄':5,'😊':4.5,'🥰':5,'😌':4,'🤩':5,'😎':4,'🥳':5,'😴':2,'😐':2.5,'🤔':3,'😰':1.5,'😤':1.5,'😔':1.5,'😢':1,'😡':1,'🤒':1.5};
-
-  // Build last 7 days array
-  const days7=Array.from({length:7},(_,i)=>{
-    const d=new Date(); d.setDate(d.getDate()-(6-i));
-    return d.toISOString().split('T')[0];
-  });
-
-  const getScore=(uid,date)=>{
-    const m=moods.find(x=>x.user_id===uid&&x.created_at.startsWith(date));
-    return m ? (SCORE[m.emoji]||3) : null;
+  // Mood → category mapping
+  const CATEGORY={
+    '😄':'Happy','😊':'Happy','🥰':'Happy','🥳':'Happy',
+    '😌':'Peaceful','😴':'Tired',
+    '🤩':'Excited','😎':'Excited',
+    '😐':'Meh','🤔':'Reflective',
+    '😰':'Anxious','😤':'Stressed','😡':'Frustrated',
+    '😔':'Sad','😢':'Sad',
+    '🤒':'Unwell',
+  };
+  const CAT_COLOR={
+    Happy:'#7BA68A', Peaceful:'#5BA4A4', Excited:'#E8A83A',
+    Meh:'#B8958A',  Reflective:'#8B6355', Tired:'#9B8EA8',
+    Anxious:'#E8735A', Stressed:'#E8735A', Frustrated:'#C0392B',
+    Sad:'#6B8CAE', Unwell:'#A0A0A0',
+  };
+  const CAT_ICON={
+    Happy:'😊', Peaceful:'😌', Excited:'🤩', Meh:'😐',
+    Reflective:'🤔', Tired:'😴', Anxious:'😰', Stressed:'😤',
+    Frustrated:'😡', Sad:'😔', Unwell:'🤒',
   };
 
-  const meScores  = days7.map(d=>getScore(ME.id,d));
-  const pScores   = PARTNER ? days7.map(d=>getScore(PARTNER.id,d)) : [];
-  const hasAnyMe  = meScores.some(s=>s!==null);
-  const hasAnyP   = pScores.some(s=>s!==null);
-
-  // SVG dimensions
-  const W=320,H=80,PX=16,PY=8;
-  const toX=i=>PX+(W-PX*2)*(i/6);
-  const toY=s=>PY+(H-PY*2)*(1-(s-1)/4);
-
-  const buildLine=(scores,stroke)=>{
-    const pts=scores.map((s,i)=>s!==null?{x:toX(i),y:toY(s)}:null);
-    const visible=pts.filter(Boolean);
-    if(!visible.length) return '';
-    // smooth curve through points
-    let path='';
-    const connected=[];
-    pts.forEach((p,i)=>{ if(p) connected.push({...p,i}); });
-    if(connected.length===1){
-      return `<circle cx="${connected[0].x}" cy="${connected[0].y}" r="4" fill="${stroke}" opacity=".9"/>`;
-    }
-    let d=`M${connected[0].x},${connected[0].y}`;
-    for(let k=1;k<connected.length;k++){
-      const a=connected[k-1],b=connected[k];
-      const cx=(a.x+b.x)/2;
-      d+=` C${cx},${a.y} ${cx},${b.y} ${b.x},${b.y}`;
-    }
-    return `
-      <path d="${d}" fill="none" stroke="${stroke}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
-      ${connected.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${stroke}" stroke="white" stroke-width="1.5" opacity=".95"/>`).join('')}`;
+  // Insights per dominant category for each person
+  const INSIGHTS_ME={
+    Happy: 'You\'ve been in a really good place lately 💛 Keep sharing that energy with your partner.',
+    Peaceful: 'You\'ve been calm and settled this week. That\'s a beautiful thing to bring to a relationship.',
+    Excited: 'You\'ve got great energy right now ⚡ Channel some of that into something fun together.',
+    Meh: 'You\'ve been feeling a bit flat lately. It happens — a small cozy moment together might help.',
+    Reflective: 'You\'ve had a lot on your mind this week. Talking it through with your partner might help.',
+    Tired: 'You\'ve been running low on energy. Make sure you\'re resting — your partner will understand.',
+    Anxious: 'You\'ve been carrying some worry this week. Let your partner in — they want to help.',
+    Stressed: 'Stress has been showing up for you lately. A quiet evening together could do a lot.',
+    Frustrated: 'It\'s been a rough week. It\'s okay — let your partner be there for you.',
+    Sad: 'You\'ve been feeling low lately. A gentle check-in with your partner might be exactly what you need.',
+    Unwell: 'You\'ve not been feeling your best. Rest up — your partner is cheering you on 💛',
+  };
+  const INSIGHTS_PARTNER={
+    Happy: (n)=>`${n} has been happy and upbeat this week 😊 Match that energy!`,
+    Peaceful: (n)=>`${n} has been calm and content. A peaceful night in together sounds perfect.`,
+    Excited: (n)=>`${n} is buzzing with excitement ⚡ Ask them what's got them going!`,
+    Meh: (n)=>`${n} has been feeling a bit flat. A small surprise or kind gesture could go a long way.`,
+    Reflective: (n)=>`${n} has had a lot on their mind. Give them space — and an open ear.`,
+    Tired: (n)=>`${n} has been tired lately. Maybe plan a slow, restful day together?`,
+    Anxious: (n)=>`${n} has been a bit anxious this week. Reassurance and closeness will mean a lot.`,
+    Stressed: (n)=>`${n} has been stressed. Ask them about it tonight — sometimes being heard is enough.`,
+    Frustrated: (n)=>`${n} has had a rough week. Check in without pressure and just be present.`,
+    Sad: (n)=>`${n} has been feeling low. A little extra warmth from you could make all the difference.`,
+    Unwell: (n)=>`${n} hasn't been feeling great. Take care of them 💛`,
   };
 
-  // Day labels
-  const labels=days7.map((d,i)=>{
-    const lbl=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'narrow'});
-    return `<text x="${toX(i)}" y="${H+12}" font-size="9.5" text-anchor="middle" fill="var(--text3)" font-family="Nunito,sans-serif">${lbl}</text>`;
-  }).join('');
+  // Build category frequency for a given uid
+  const buildAnalysis=(uid, moodData)=>{
+    const userMoods=moodData.filter(m=>m.user_id===uid);
+    if(!userMoods.length) return null;
+    const freq={};
+    userMoods.forEach(m=>{
+      const cat=CATEGORY[m.emoji]||'Meh';
+      freq[cat]=(freq[cat]||0)+1;
+    });
+    const total=userMoods.length;
+    const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+    const dominant=sorted[0][0];
+    return{freq,sorted,total,dominant};
+  };
 
-  // Horizontal guide lines
-  const guides=[1,2.5,4].map(s=>`<line x1="${PX}" y1="${toY(s)}" x2="${W-PX}" y2="${toY(s)}" stroke="var(--bd)" stroke-width="1" stroke-dasharray="3,4"/>`).join('');
+  const meAnalysis = buildAnalysis(ME.id, moods);
+  const pAnalysis  = PARTNER ? buildAnalysis(PARTNER.id, moods) : null;
 
-  const svg=`<svg viewBox="0 0 ${W} ${H+18}" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;overflow:visible;margin-bottom:2px">
-    ${guides}
-    ${hasAnyMe  ? buildLine(meScores, 'var(--rose)') : ''}
-    ${hasAnyP   ? buildLine(pScores,  'var(--teal)') : ''}
-    ${labels}
-  </svg>`;
+  // Render one analysis block
+  const renderBlock=(analysis, name, accentColor, insight)=>{
+    if(!analysis) return `<div style="font-size:12px;color:var(--text3);padding:6px 0">No data for ${name} yet.</div>`;
+    const bars=analysis.sorted.slice(0,4).map(([cat,count])=>{
+      const pct=Math.round((count/analysis.total)*100);
+      const color=CAT_COLOR[cat]||'var(--text3)';
+      return`<div style="margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <div style="font-size:12px;color:var(--text);font-weight:500">${CAT_ICON[cat]||''} ${cat}</div>
+          <div style="font-size:11px;color:var(--text3)">${pct}%</div>
+        </div>
+        <div style="height:6px;background:var(--bd);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .6s ease"></div>
+        </div>
+      </div>`;
+    }).join('');
 
-  // Legend
-  const legend=`<div style="display:flex;gap:14px;margin-bottom:12px;padding:0 2px">
-    ${hasAnyMe?`<div style="display:flex;align-items:center;gap:5px">
-      <div style="width:22px;height:3px;border-radius:2px;background:var(--rose)"></div>
-      <span style="font-size:11px;color:var(--text3)">${ME?.name||'You'}</span>
-    </div>`:''}
-    ${hasAnyP?`<div style="display:flex;align-items:center;gap:5px">
-      <div style="width:22px;height:3px;border-radius:2px;background:var(--teal)"></div>
-      <span style="font-size:11px;color:var(--text3)">${PARTNER?.name||'Partner'}</span>
-    </div>`:''}
-  </div>`;
-
-  // Recent mood rows (last 5)
-  const rows=moods.slice(0,5).map(m=>{
-    const mine=m.user_id===ME.id;
-    const who=mine?(ME?.name||'You'):(PARTNER?.name||'Partner');
-    const dt=new Date(m.created_at).toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
-    return`<div class="mhrow">
-      <div style="font-size:20px">${m.emoji}</div>
-      <div class="mhinfo"><div class="mhname">${who} · ${m.label}</div>${m.note?`<div class="mhnote">"${m.note}"</div>`:''}</div>
-      <div class="mhtime">${dt}</div>
+    return`<div style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${accentColor};flex-shrink:0"></div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-left:auto">${analysis.total} mood${analysis.total!==1?'s':''} logged</div>
+      </div>
+      ${bars}
+      <div style="font-size:12px;color:var(--text2);line-height:1.55;padding:9px 11px;background:var(--cream);border-radius:var(--rsm);margin-top:6px;border-left:3px solid ${accentColor}40">${insight}</div>
     </div>`;
-  }).join('');
+  };
 
-  hist.innerHTML = svg + legend + rows;
+  const myInsight = meAnalysis ? (INSIGHTS_ME[meAnalysis.dominant]||'Keep sharing your mood daily 💛') : '';
+  const pInsight  = pAnalysis  ? (typeof INSIGHTS_PARTNER[pAnalysis.dominant]==='function'
+    ? INSIGHTS_PARTNER[pAnalysis.dominant](PARTNER?.name||'Partner')
+    : `${PARTNER?.name||'Partner'} has been feeling ${pAnalysis.dominant.toLowerCase()} lately.`) : '';
+
+  hist.innerHTML =
+    renderBlock(meAnalysis, ME?.name||'You', 'var(--rose)', myInsight) +
+    (pAnalysis ? `<div style="height:1px;background:var(--bd);margin-bottom:14px"></div>` : '') +
+    renderBlock(pAnalysis, PARTNER?.name||'Partner', 'var(--teal)', pInsight);
 }
 
 // NEST
