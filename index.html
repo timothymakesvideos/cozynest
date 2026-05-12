@@ -217,22 +217,15 @@
   <div class="card">
     <div class="ctitle">Your profile</div>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-      <div id="settings-avatar" style="font-size:36px;width:52px;height:52px;border-radius:50%;background:var(--rose-l);display:flex;align-items:center;justify-content:center">🐻</div>
+      <div id="settings-avatar" style="width:56px;height:56px;border-radius:50%;background:var(--rose-l);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0"></div>
       <div><div id="settings-name" style="font-size:16px;font-weight:700"></div><div id="settings-email" style="font-size:12px;color:var(--text3);margin-top:2px"></div></div>
     </div>
     <div class="ob-lbl">Change your name</div>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
+    <div style="display:flex;gap:8px;margin-bottom:12px">
       <input class="ob-inp" id="settings-name-inp" placeholder="Your name" maxlength="20" style="flex:1">
       <button class="btn-save" style="width:auto;padding:11px 16px;margin-top:0" onclick="saveName()">Save</button>
     </div>
-    <div class="ob-lbl">Change your avatar</div>
-    <div class="ob-emrow" id="settings-av-row">
-      <button class="ob-em" data-e="🐻" onclick="saveAvatar(this)">🐻</button>
-      <button class="ob-em" data-e="🐱" onclick="saveAvatar(this)">🐱</button>
-      <button class="ob-em" data-e="🐰" onclick="saveAvatar(this)">🐰</button>
-      <button class="ob-em" data-e="🦊" onclick="saveAvatar(this)">🦊</button>
-      <button class="ob-em" data-e="🐸" onclick="saveAvatar(this)">🐸</button>
-    </div>
+    <button class="btn-save" style="background:var(--teal)" onclick="openCharCustomizer()">✨ Customize your character</button>
   </div>
 
   <!-- Couple / Invite Code -->
@@ -374,6 +367,19 @@
     <div class="modal-handle"></div>
     <div id="streak-reward-body"></div>
     <button class="btn-save" style="margin-top:4px" onclick="hideModal('modal-streak-reward')">Claim reward 🎉</button>
+  </div>
+</div>
+
+<!-- MODAL: CHARACTER CUSTOMIZER -->
+<div class="modal-ov hidden" id="modal-char" onclick="ovClose(event,'modal-char')">
+  <div class="modal-sh" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div style="font-family:'Lora',serif;font-size:17px;font-weight:700;color:var(--text);margin-bottom:14px">✨ Your character</div>
+    <div id="char-body"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-cancel" style="flex:1" onclick="hideModal('modal-char')">Cancel</button>
+      <button class="btn-save" style="flex:2" onclick="saveCharacter()">Save character ✓</button>
+    </div>
   </div>
 </div>
 
