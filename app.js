@@ -502,10 +502,10 @@ function updateGreeting(){
 // HOME
 function renderHome(){
   const meAvEl=g('hav-me');const pAvEl=g('hav-p');
-  if(meAvEl) meAvEl.innerHTML=buildAvatarSVG(getCharConfig(ME),40);
-  if(pAvEl)  pAvEl.innerHTML=PARTNER?buildAvatarSVG(getCharConfig(PARTNER),40):`<span style="font-size:32px">${ME?.avatar||'🐱'}</span>`;
-  g('hn-me').textContent=ME?.name||'You';
-  g('hn-p').textContent=PARTNER?.name||'Partner';
+  if(meAvEl) meAvEl.innerHTML=buildCharacterHTML(getCharConfig(ME),44);
+  if(pAvEl)  pAvEl.innerHTML=PARTNER?buildCharacterHTML(getCharConfig(PARTNER),44):`<div style="width:44px;height:44px;border-radius:50%;background:var(--teal-l);display:flex;align-items:center;justify-content:center;font-size:24px">🐱</div>`;
+  if(g('hn-me')) g('hn-me').textContent=ME?.name||'You';
+  if(g('hn-p'))  g('hn-p').textContent=PARTNER?.name||'Partner';
   g('hm-me').textContent=MY_MOOD?.emoji||'—';g('hnote-me').textContent=MY_MOOD?.note||MY_MOOD?.label||'No mood yet';
   g('hm-p').textContent=P_MOOD?.emoji||'—';g('hnote-p').textContent=P_MOOD?.note||P_MOOD?.label||(PARTNER?'No mood yet':'Waiting for partner...');
   const pool=pickPool(TODAY()).map(a=>({...a,isCustom:false}));
@@ -1137,7 +1137,7 @@ function renderSettings(){
   if(!ME) return;
   // SVG character preview
   const avEl = g('settings-avatar');
-  if(avEl) avEl.innerHTML = buildAvatarSVG(getCharConfig(ME), 52);
+  if(avEl) avEl.innerHTML = buildCharacterHTML(getCharConfig(ME), 52);
   g('settings-name').textContent = ME?.name||'You';
   g('settings-email').textContent = ME?.email||(db.auth.getUser().then(r=>r.data?.user?.email||''));
   g('settings-name-inp').value = ME?.name||'';
@@ -1298,41 +1298,52 @@ function buildCharacterHTML(config, size=200){
   const scale = size/400; // our canvas is 400×400
   const imgStyle = `position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain`;
 
+  // Helper: resolve correct src path from manifest item
+  const src = (folder, item) => {
+    if(!item) return '';
+    // If manifest stored a full relative path like "outfits/out_x.png", use it directly
+    if(item.file && item.file.includes('/')) return `${ASSET_BASE}/${item.file}`;
+    // Otherwise build from folder + id
+    return `${ASSET_BASE}/${folder}/${item.id}.png`;
+  };
+
   const layers = [];
 
   // 1 — Outfit (bottom)
-  if(outfit && outfit.id !== 'none'){
-    layers.push(`<img src="${ASSET_BASE}/outfits/${outfit.file||outfit.id+'.png'}" style="${imgStyle}" draggable="false">`);
+  if(outfit && !['none','out_none'].includes(outfit.id)){
+    layers.push(`<img src="${src('outfits',outfit)}" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
   }
 
   // 2 — Hair back (behind head)
-  if(hairStyle && hairStyle.id !== 'none'){
+  if(hairStyle && !['none','h_none'].includes(hairStyle.id)){
     const hFilter = hairColor ? hexToFilter(hairColor.color) : '';
-    layers.push(`<img src="${ASSET_BASE}/hair/${hairStyle.id}_back.png" style="${imgStyle};filter:${hFilter}" draggable="false" onerror="this.style.display='none'">`);
+    const backSrc = hairStyle.back
+      ? `${ASSET_BASE}/${hairStyle.back}`
+      : `${ASSET_BASE}/hair/${hairStyle.id}_back.png`;
+    layers.push(`<img src="${backSrc}" style="${imgStyle};filter:${hFilter}" draggable="false" onerror="this.style.display='none'">`);
   }
 
   // 3 — Head / skin
-  if(skin){
-    const sFilter = skinFilter(skin.color);
-    layers.push(`<img src="${ASSET_BASE}/head.png" style="${imgStyle};filter:${sFilter}" draggable="false" onerror="this.style.display='none'">`);
-  } else {
-    layers.push(`<img src="${ASSET_BASE}/head.png" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
-  }
+  const sFilter = skin ? skinFilter(skin.color) : '';
+  layers.push(`<img src="${ASSET_BASE}/head.png" style="${imgStyle};filter:${sFilter}" draggable="false" onerror="this.style.display='none'">`);
 
   // 4 — Hair front (over face)
-  if(hairStyle && hairStyle.id !== 'none'){
+  if(hairStyle && !['none','h_none'].includes(hairStyle.id)){
     const hFilter = hairColor ? hexToFilter(hairColor.color) : '';
-    layers.push(`<img src="${ASSET_BASE}/hair/${hairStyle.id}_front.png" style="${imgStyle};filter:${hFilter}" draggable="false" onerror="this.style.display='none'">`);
+    const frontSrc = hairStyle.front
+      ? `${ASSET_BASE}/${hairStyle.front}`
+      : `${ASSET_BASE}/hair/${hairStyle.id}_front.png`;
+    layers.push(`<img src="${frontSrc}" style="${imgStyle};filter:${hFilter}" draggable="false" onerror="this.style.display='none'">`);
   }
 
   // 5 — Hat
-  if(hat && hat.id !== 'hat_none' && hat.id !== 'none'){
-    layers.push(`<img src="${ASSET_BASE}/hats/${hat.file||hat.id+'.png'}" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
+  if(hat && !['none','hat_none'].includes(hat.id)){
+    layers.push(`<img src="${src('hats',hat)}" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
   }
 
   // 6 — Accessory (top)
-  if(acc && acc.id !== 'acc_none' && acc.id !== 'none'){
-    layers.push(`<img src="${ASSET_BASE}/accessories/${acc.file||acc.id+'.png'}" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
+  if(acc && !['none','acc_none'].includes(acc.id)){
+    layers.push(`<img src="${src('accessories',acc)}" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
   }
 
   return `<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0">
@@ -1412,14 +1423,17 @@ function renderCharModal(){
       grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No hairstyles in manifest yet.<br>Add PNG files and run the generator.</div>`;
     } else {
       grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${(m.hair||[]).map(h=>itemBtn(
-          h.id, charDraft.hair===h.id, h.coins||0, unlocked.includes(h.id)||(h.coins||0)===0,
-          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
-            <img src="${ASSET_BASE}/hair/${h.id}_front.png" style="width:100%;height:100%;object-fit:contain;filter:${hexToFilter('#6B3A2A')}" onerror="this.parentElement.innerHTML='💇'">
-          </div>
-          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${h.label}</div>`,
-          'padding:6px;display:flex;flex-direction:column'
-        )).join('')}
+        ${(m.hair||[]).map(h=>{
+          const frontSrc = h.front ? `${ASSET_BASE}/${h.front}` : `${ASSET_BASE}/hair/${h.id}_front.png`;
+          return itemBtn(
+            h.id, charDraft.hair===h.id, h.coins||0, unlocked.includes(h.id)||(h.coins||0)===0,
+            `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+              <img src="${frontSrc}" style="width:100%;height:100%;object-fit:contain;filter:${hexToFilter('#6B3A2A')}" onerror="this.style.opacity=0">
+            </div>
+            <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${h.label}</div>`,
+            'padding:6px;display:flex;flex-direction:column'
+          );
+        }).join('')}
       </div>`;
     }
 
@@ -1438,14 +1452,17 @@ function renderCharModal(){
       grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No outfits in manifest yet.</div>`;
     } else {
       grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${(m.outfits||[]).map(o=>itemBtn(
-          o.id, charDraft.outfit===o.id, o.coins||0, unlocked.includes(o.id)||(o.coins||0)===0,
-          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
-            <img src="${ASSET_BASE}/outfits/${o.file||o.id+'.png'}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='👕'">
-          </div>
-          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${o.label}</div>`,
-          'padding:6px;display:flex;flex-direction:column'
-        )).join('')}
+        ${(m.outfits||[]).map(o=>{
+          const fileSrc = o.file && o.file.includes('/') ? `${ASSET_BASE}/${o.file}` : `${ASSET_BASE}/outfits/${o.id}.png`;
+          return itemBtn(
+            o.id, charDraft.outfit===o.id, o.coins||0, unlocked.includes(o.id)||(o.coins||0)===0,
+            `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+              <img src="${fileSrc}" style="width:100%;height:100%;object-fit:contain" onerror="this.style.opacity=0">
+            </div>
+            <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${o.label}</div>`,
+            'padding:6px;display:flex;flex-direction:column'
+          );
+        }).join('')}
       </div>`;
     }
 
@@ -1454,14 +1471,17 @@ function renderCharModal(){
       grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No hats in manifest yet.</div>`;
     } else {
       grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${(m.hats||[]).map(h=>itemBtn(
-          h.id, charDraft.hat===h.id, h.coins||0, unlocked.includes(h.id)||(h.coins||0)===0,
-          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
-            <img src="${ASSET_BASE}/hats/${h.file||h.id+'.png'}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='🎩'">
-          </div>
-          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${h.label}</div>`,
-          'padding:6px;display:flex;flex-direction:column'
-        )).join('')}
+        ${(m.hats||[]).map(h=>{
+          const fileSrc = h.file && h.file.includes('/') ? `${ASSET_BASE}/${h.file}` : `${ASSET_BASE}/hats/${h.id}.png`;
+          return itemBtn(
+            h.id, charDraft.hat===h.id, h.coins||0, unlocked.includes(h.id)||(h.coins||0)===0,
+            `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+              <img src="${fileSrc}" style="width:100%;height:100%;object-fit:contain" onerror="this.style.opacity=0">
+            </div>
+            <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${h.label}</div>`,
+            'padding:6px;display:flex;flex-direction:column'
+          );
+        }).join('')}
       </div>`;
     }
 
@@ -1470,14 +1490,17 @@ function renderCharModal(){
       grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No accessories in manifest yet.</div>`;
     } else {
       grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${(m.accessories||[]).map(a=>itemBtn(
-          a.id, charDraft.accessory===a.id, a.coins||0, unlocked.includes(a.id)||(a.coins||0)===0,
-          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
-            <img src="${ASSET_BASE}/accessories/${a.file||a.id+'.png'}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='✨'">
-          </div>
-          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${a.label}</div>`,
-          'padding:6px;display:flex;flex-direction:column'
-        )).join('')}
+        ${(m.accessories||[]).map(a=>{
+          const fileSrc = a.file && a.file.includes('/') ? `${ASSET_BASE}/${a.file}` : `${ASSET_BASE}/accessories/${a.id}.png`;
+          return itemBtn(
+            a.id, charDraft.accessory===a.id, a.coins||0, unlocked.includes(a.id)||(a.coins||0)===0,
+            `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+              <img src="${fileSrc}" style="width:100%;height:100%;object-fit:contain" onerror="this.style.opacity=0">
+            </div>
+            <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${a.label}</div>`,
+            'padding:6px;display:flex;flex-direction:column'
+          );
+        }).join('')}
       </div>`;
     }
   }
