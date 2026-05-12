@@ -1213,32 +1213,56 @@ async function saveAvatar(btn){
 const ASSET_BASE = '/assets/character';
 let CHAR_MANIFEST = null;
 
-// CSS filter to recolour a #1A1A1A black image to a target hex colour
+// Recolour a black (#1A1A1A) hair image to a target hex colour
+// Uses a sepia→hue-rotate→saturate→brightness chain which works reliably on dark sources
 function hexToFilter(hex){
-  // Parse hex
-  const r=parseInt(hex.slice(1,3),16)/255;
-  const g=parseInt(hex.slice(3,5),16)/255;
-  const b=parseInt(hex.slice(5,7),16)/255;
-  // Convert to HSL
-  const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+  if(!hex||hex==='#1A1A1A') return 'brightness(0.12)'; // pure dark, no shift needed
+  const r=parseInt(hex.slice(1,3),16);
+  const g=parseInt(hex.slice(3,5),16);
+  const b=parseInt(hex.slice(5,7),16);
+  // Convert RGB to HSL
+  const rf=r/255,gf=g/255,bf=b/255;
+  const max=Math.max(rf,gf,bf),min=Math.min(rf,gf,bf),d=max-min;
   let h=0,s=0,l=(max+min)/2;
-  if(d){
+  if(d>0){
     s=d/(1-Math.abs(2*l-1));
-    if(max===r) h=((g-b)/d+6)%6;
-    else if(max===g) h=(b-r)/d+2;
-    else h=(r-g)/d+4;
-    h=Math.round(h*60);
+    if(max===rf) h=((gf-bf)/d+6)%6;
+    else if(max===gf) h=(bf-rf)/d+2;
+    else h=(rf-gf)/d+4;
+    h=h*60;
   }
-  s=Math.round(s*100); l=Math.round(l*100);
-  // Build filter chain: sepia gives a warm base, then hue-rotate + saturate + brightness
-  const bri = Math.round(l*2.2);
-  return `sepia(1) saturate(${s*3}%) hue-rotate(${h-30}deg) brightness(${bri}%)`;
+  // Filter chain: start from near-black source
+  // sepia(1) gives a warm brown base at hue ~30
+  // hue-rotate shifts from that base to target hue
+  const hueShift = Math.round(h - 30); // 30 = sepia base hue
+  const sat      = Math.round(s * 750); // amplify saturation significantly
+  const bri      = Math.round(l * 220); // brightness from lightness
+  return `brightness(0) sepia(1) hue-rotate(${hueShift}deg) saturate(${sat}%) brightness(${bri}%)`;
 }
 
-// Skin recolour: source image is drawn in #E8B88A, shift to target
+// Recolour a #E8AA7A skin image to a target skin tone hex
+// Works by adjusting hue-rotate + brightness relative to the source mid-tone
 function skinFilter(targetHex){
-  // We treat skin the same as hair — just shift hue/sat/brightness
-  return hexToFilter(targetHex);
+  if(!targetHex) return '';
+  const SRC_H = 25; // hue of #E8AA7A (warm orange-skin)
+  const SRC_L = 69; // lightness% of #E8AA7A
+  const r=parseInt(targetHex.slice(1,3),16);
+  const g=parseInt(targetHex.slice(3,5),16);
+  const b=parseInt(targetHex.slice(5,7),16);
+  const rf=r/255,gf=g/255,bf=b/255;
+  const max=Math.max(rf,gf,bf),min=Math.min(rf,gf,bf),d=max-min;
+  let h=0,s=0,l=(max+min)/2;
+  if(d>0){
+    s=d/(1-Math.abs(2*l-1));
+    if(max===rf) h=((gf-bf)/d+6)%6;
+    else if(max===gf) h=(bf-rf)/d+2;
+    else h=(rf-gf)/d+4;
+    h=h*60;
+  }
+  const hueShift = Math.round(h - SRC_H);
+  const briShift = Math.round((l*100/SRC_L)*100);
+  const satShift = Math.round(s*120);
+  return `sepia(0.3) hue-rotate(${hueShift}deg) saturate(${satShift}%) brightness(${briShift}%)`;
 }
 
 async function loadManifest(){
