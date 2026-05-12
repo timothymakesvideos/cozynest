@@ -1,0 +1,25 @@
+name: Generate character manifest
+
+on:
+  push:
+    paths:
+      - 'assets/character/**'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate manifest.json
+        run: node generate-manifest.js
+
+      - name: Commit updated manifest
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🎨 Auto-update character manifest"
+          file_pattern: assets/character/manifest.json
