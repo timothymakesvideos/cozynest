@@ -259,6 +259,7 @@ async function boot(){
 
     // Step 8: Show app
     subscribeRT();
+    loadManifest().catch(e=>console.warn('manifest load failed:',e));
     loading(false);
     g('auth-screen').classList.add('hidden');
     g('couple-screen').classList.add('hidden');
@@ -1207,146 +1208,126 @@ async function saveAvatar(btn){
   renderHome(); toast('Avatar updated ✓');
 }
 
-// ── CHARACTER CUSTOMIZATION ──────────────────────────────────
+// ── CHARACTER CUSTOMIZATION (asset-based) ────────────────────
 
-const CHAR_PARTS = {
-  skin: [
-    {id:'s1', color:'#FDDBB4', label:'Light'},
-    {id:'s2', color:'#F5C18A', label:'Warm'},
-    {id:'s3', color:'#E8A96A', label:'Golden'},
-    {id:'s4', color:'#C68642', label:'Brown'},
-    {id:'s5', color:'#8D5524', label:'Deep'},
-  ],
-  hair: [
-    {id:'h1', color:'#2C1810', label:'Jet black'},
-    {id:'h2', color:'#6B3A2A', label:'Dark brown'},
-    {id:'h3', color:'#A0522D', label:'Auburn'},
-    {id:'h4', color:'#C8A882', label:'Blonde'},
-    {id:'h5', color:'#E8C87A', label:'Golden'},
-    {id:'h6', color:'#8B7BA8', label:'Lavender'},
-    {id:'h7', color:'#E87878', label:'Rose'},
-    {id:'h8', color:'#78B4E8', label:'Blue'},
-  ],
-  hat: [
-    {id:'hat0', label:'None',       emoji:'',   coins:0},
-    {id:'hat1', label:'Beanie',     emoji:'🧢', coins:0},
-    {id:'hat2', label:'Sun hat',    emoji:'👒', coins:30},
-    {id:'hat3', label:'Cap',        emoji:'🧢', coins:30},
-    {id:'hat4', label:'Crown',      emoji:'👑', coins:80},
-    {id:'hat5', label:'Wizard',     emoji:'🧙', coins:80},
-    {id:'hat6', label:'Santa',      emoji:'🎅', coins:50},
-    {id:'hat7', label:'Halo',       emoji:'😇', coins:120},
-    {id:'hat8', label:'Party hat',  emoji:'🎉', coins:40},
-  ],
-  outfit: [
-    {id:'out1', label:'Cozy sweater', color:'#E8735A', coins:0},
-    {id:'out2', label:'Soft teal',    color:'#5BA4A4', coins:0},
-    {id:'out3', label:'Sunny yellow', color:'#E8A83A', coins:30},
-    {id:'out4', label:'Sage green',   color:'#7BA68A', coins:30},
-    {id:'out5', label:'Soft pink',    color:'#F5A48B', coins:40},
-    {id:'out6', label:'Deep brown',   color:'#8B6355', coins:40},
-    {id:'out7', label:'Midnight',     color:'#3D2B23', coins:60},
-    {id:'out8', label:'Lavender',     color:'#9B8EA8', coins:60},
-  ],
-  accessory: [
-    {id:'acc0', label:'None',       svg:'',   coins:0},
-    {id:'acc1', label:'Glasses',    svg:'glasses', coins:20},
-    {id:'acc2', label:'Sunglasses', svg:'shades',  coins:30},
-    {id:'acc3', label:'Earrings',   svg:'earrings',coins:20},
-    {id:'acc4', label:'Freckles',   svg:'freckles',coins:0},
-    {id:'acc5', label:'Blush',      svg:'blush',   coins:0},
-  ],
-};
+const ASSET_BASE = '/assets/character';
+let CHAR_MANIFEST = null;
 
-const CHAR_DEFAULTS = {skin:'s1',hair:'h1',hat:'hat0',outfit:'out1',accessory:'acc0'};
+// CSS filter to recolour a #1A1A1A black image to a target hex colour
+function hexToFilter(hex){
+  // Parse hex
+  const r=parseInt(hex.slice(1,3),16)/255;
+  const g=parseInt(hex.slice(3,5),16)/255;
+  const b=parseInt(hex.slice(5,7),16)/255;
+  // Convert to HSL
+  const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+  let h=0,s=0,l=(max+min)/2;
+  if(d){
+    s=d/(1-Math.abs(2*l-1));
+    if(max===r) h=((g-b)/d+6)%6;
+    else if(max===g) h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h=Math.round(h*60);
+  }
+  s=Math.round(s*100); l=Math.round(l*100);
+  // Build filter chain: sepia gives a warm base, then hue-rotate + saturate + brightness
+  const bri = Math.round(l*2.2);
+  return `sepia(1) saturate(${s*3}%) hue-rotate(${h-30}deg) brightness(${bri}%)`;
+}
+
+// Skin recolour: source image is drawn in #E8B88A, shift to target
+function skinFilter(targetHex){
+  // We treat skin the same as hair — just shift hue/sat/brightness
+  return hexToFilter(targetHex);
+}
+
+async function loadManifest(){
+  if(CHAR_MANIFEST) return CHAR_MANIFEST;
+  try{
+    const r = await fetch(`${ASSET_BASE}/manifest.json?_=${Date.now()}`);
+    CHAR_MANIFEST = await r.json();
+  } catch(e){
+    console.warn('Character manifest not found — using empty manifest');
+    CHAR_MANIFEST = {skin:[],hairColors:[],hair:[],outfits:[],hats:[],accessories:[]};
+  }
+  return CHAR_MANIFEST;
+}
 
 function getCharConfig(profile){
-  try{ return {...CHAR_DEFAULTS,...(profile?.avatar_config||{})}; }
-  catch(e){ return {...CHAR_DEFAULTS}; }
+  try{ return {...(profile?.avatar_config||{})}; }
+  catch(e){ return {}; }
 }
 
-function buildAvatarSVG(config, size=80){
-  const c = {...CHAR_DEFAULTS, ...config};
-  const skin  = CHAR_PARTS.skin.find(x=>x.id===c.skin)  || CHAR_PARTS.skin[0];
-  const hair  = CHAR_PARTS.hair.find(x=>x.id===c.hair)  || CHAR_PARTS.hair[0];
-  const outfit= CHAR_PARTS.outfit.find(x=>x.id===c.outfit)||CHAR_PARTS.outfit[0];
-  const hat   = CHAR_PARTS.hat.find(x=>x.id===c.hat)    || CHAR_PARTS.hat[0];
-  const acc   = CHAR_PARTS.accessory.find(x=>x.id===c.accessory)||CHAR_PARTS.accessory[0];
-  const s = size, cx=s/2;
+// Build layered character HTML — stacked absolute PNGs
+function buildCharacterHTML(config, size=200){
+  if(!CHAR_MANIFEST) return `<div style="width:${size}px;height:${size}px;background:var(--rose-l);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${size*.4}px">🐣</div>`;
+  const m = CHAR_MANIFEST;
+  const c = config||{};
 
-  // Accessory overlays
-  const accSVG = {
-    glasses: `<ellipse cx="${cx-10}" cy="${s*.42}" rx="7" ry="5" fill="none" stroke="#333" stroke-width="1.5"/>
-              <ellipse cx="${cx+10}" cy="${s*.42}" rx="7" ry="5" fill="none" stroke="#333" stroke-width="1.5"/>
-              <line x1="${cx-3}" y1="${s*.42}" x2="${cx+3}" y2="${s*.42}" stroke="#333" stroke-width="1.5"/>`,
-    shades:  `<ellipse cx="${cx-10}" cy="${s*.42}" rx="7" ry="5" fill="#2C3E50" opacity=".85"/>
-              <ellipse cx="${cx+10}" cy="${s*.42}" rx="7" ry="5" fill="#2C3E50" opacity=".85"/>
-              <line x1="${cx-3}" y1="${s*.42}" x2="${cx+3}" y2="${s*.42}" stroke="#2C3E50" stroke-width="1.5"/>`,
-    earrings:`<circle cx="${cx-18}" cy="${s*.48}" r="3" fill="#E8A83A"/>
-              <circle cx="${cx+18}" cy="${s*.48}" r="3" fill="#E8A83A"/>`,
-    freckles:`<circle cx="${cx-8}" cy="${s*.46}" r="1.5" fill="${skin.color}" filter="url(#dk)"/>
-              <circle cx="${cx-5}" cy="${s*.48}" r="1.5" fill="#C68642" opacity=".4"/>
-              <circle cx="${cx+5}" cy="${s*.48}" r="1.5" fill="#C68642" opacity=".4"/>
-              <circle cx="${cx+8}" cy="${s*.46}" r="1.5" fill="#C68642" opacity=".4"/>`,
-    blush:   `<ellipse cx="${cx-12}" cy="${s*.49}" rx="6" ry="4" fill="#F5A48B" opacity=".45"/>
-              <ellipse cx="${cx+12}" cy="${s*.49}" rx="6" ry="4" fill="#F5A48B" opacity=".45"/>`,
-    '':      '',
-  }[acc.svg]||'';
+  const skin      = m.skin?.find(x=>x.id===c.skin)         || m.skin?.[0];
+  const hairStyle = m.hair?.find(x=>x.id===c.hair)         || m.hair?.[0];
+  const hairColor = m.hairColors?.find(x=>x.id===c.hairColor) || m.hairColors?.[0];
+  const outfit    = m.outfits?.find(x=>x.id===c.outfit)    || m.outfits?.[0];
+  const hat       = m.hats?.find(x=>x.id===c.hat);
+  const acc       = m.accessories?.find(x=>x.id===c.accessory);
 
-  // Hat overlays
-  const hatSVG = {
-    hat0:'',
-    hat1:`<ellipse cx="${cx}" cy="${s*.18}" rx="${s*.22}" ry="${s*.07}" fill="${hair.color}"/>
-          <rect x="${cx-s*.2}" y="${s*.08}" width="${s*.4}" height="${s*.12}" rx="${s*.06}" fill="${hair.color}"/>`,
-    hat2:`<ellipse cx="${cx}" cy="${s*.15}" rx="${s*.28}" ry="${s*.05}" fill="#C8A060"/>
-          <ellipse cx="${cx}" cy="${s*.11}" rx="${s*.18}" ry="${s*.1}" fill="#D4AA70"/>`,
-    hat3:`<rect x="${cx-s*.2}" y="${s*.08}" width="${s*.4}" height="${s*.12}" rx="${s*.04}" fill="#E8735A"/>
-          <rect x="${cx-s*.24}" y="${s*.18}" width="${s*.48}" height="${s*.04}" rx="${s*.02}" fill="#C0392B"/>`,
-    hat4:`<polygon points="${cx},${s*.02} ${cx-s*.12},${s*.18} ${cx+s*.12},${s*.18}" fill="#E8A83A"/>
-          <ellipse cx="${cx}" cy="${s*.18}" rx="${s*.14}" ry="${s*.04}" fill="#E8A83A"/>`,
-    hat5:`<polygon points="${cx},${s*.0} ${cx-s*.14},${s*.2} ${cx+s*.14},${s*.2}" fill="#4A3060"/>
-          <ellipse cx="${cx}" cy="${s*.2}" rx="${s*.18}" ry="${s*.04}" fill="#6A4080"/>`,
-    hat6:`<ellipse cx="${cx}" cy="${s*.12}" rx="${s*.18}" ry="${s*.1}" fill="#E8735A"/>
-          <ellipse cx="${cx}" cy="${s*.1}" rx="${s*.06}" ry="${s*.04}" fill="white"/>`,
-    hat7:`<ellipse cx="${cx}" cy="${s*.08}" rx="${s*.2}" ry="${s*.04}" fill="#E8D870" opacity=".9"/>`,
-    hat8:`<polygon points="${cx},${s*.0} ${cx-s*.12},${s*.16} ${cx+s*.12},${s*.16}" fill="#E8735A"/>
-          <ellipse cx="${cx}" cy="${s*.16}" rx="${s*.14}" ry="${s*.04}" fill="#C0392B"/>
-          <circle cx="${cx}" cy="${s*.02}" r="${s*.03}" fill="#E8A83A"/>`,
-  }[hat.id]||'';
+  const scale = size/400; // our canvas is 400×400
+  const imgStyle = `position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain`;
 
-  return `<svg viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" style="display:block">
-    <defs><filter id="dk"><feColorMatrix type="saturate" values="0.6"/></filter></defs>
-    <!-- Body / outfit -->
-    <ellipse cx="${cx}" cy="${s*.82}" rx="${s*.28}" ry="${s*.22}" fill="${outfit.color}"/>
-    <!-- Neck -->
-    <rect x="${cx-s*.07}" y="${s*.58}" width="${s*.14}" height="${s*.1}" rx="${s*.04}" fill="${skin.color}"/>
-    <!-- Head -->
-    <ellipse cx="${cx}" cy="${s*.4}" rx="${s*.22}" ry="${s*.24}" fill="${skin.color}"/>
-    <!-- Hair back -->
-    <ellipse cx="${cx}" cy="${s*.32}" rx="${s*.22}" ry="${s*.14}" fill="${hair.color}"/>
-    <!-- Eyes -->
-    <circle cx="${cx-s*.08}" cy="${s*.4}" r="${s*.035}" fill="#2C1810"/>
-    <circle cx="${cx+s*.08}" cy="${s*.4}" r="${s*.035}" fill="#2C1810"/>
-    <circle cx="${cx-s*.07}" cy="${s*.39}" r="${s*.012}" fill="white"/>
-    <circle cx="${cx+s*.09}" cy="${s*.39}" r="${s*.012}" fill="white"/>
-    <!-- Nose -->
-    <ellipse cx="${cx}" cy="${s*.46}" rx="${s*.025}" ry="${s*.018}" fill="${skin.color}" stroke="#C68642" stroke-width=".8" opacity=".5"/>
-    <!-- Mouth -->
-    <path d="M${cx-s*.06},${s*.5} Q${cx},${s*.54} ${cx+s*.06},${s*.5}" fill="none" stroke="#8B4040" stroke-width="1.4" stroke-linecap="round"/>
-    <!-- Accessory -->
-    ${accSVG}
-    <!-- Hair front / fringe -->
-    <ellipse cx="${cx}" cy="${s*.26}" rx="${s*.2}" ry="${s*.08}" fill="${hair.color}"/>
-    <!-- Hat -->
-    ${hatSVG}
-  </svg>`;
+  const layers = [];
+
+  // 1 — Outfit (bottom)
+  if(outfit && outfit.id !== 'none'){
+    layers.push(`<img src="${ASSET_BASE}/outfits/${outfit.file||outfit.id+'.png'}" style="${imgStyle}" draggable="false">`);
+  }
+
+  // 2 — Hair back (behind head)
+  if(hairStyle && hairStyle.id !== 'none'){
+    const hFilter = hairColor ? hexToFilter(hairColor.color) : '';
+    layers.push(`<img src="${ASSET_BASE}/hair/${hairStyle.id}_back.png" style="${imgStyle};filter:${hFilter}" draggable="false" onerror="this.style.display='none'">`);
+  }
+
+  // 3 — Head / skin
+  if(skin){
+    const sFilter = skinFilter(skin.color);
+    layers.push(`<img src="${ASSET_BASE}/head.png" style="${imgStyle};filter:${sFilter}" draggable="false" onerror="this.style.display='none'">`);
+  } else {
+    layers.push(`<img src="${ASSET_BASE}/head.png" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
+  }
+
+  // 4 — Hair front (over face)
+  if(hairStyle && hairStyle.id !== 'none'){
+    const hFilter = hairColor ? hexToFilter(hairColor.color) : '';
+    layers.push(`<img src="${ASSET_BASE}/hair/${hairStyle.id}_front.png" style="${imgStyle};filter:${hFilter}" draggable="false" onerror="this.style.display='none'">`);
+  }
+
+  // 5 — Hat
+  if(hat && hat.id !== 'hat_none' && hat.id !== 'none'){
+    layers.push(`<img src="${ASSET_BASE}/hats/${hat.file||hat.id+'.png'}" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
+  }
+
+  // 6 — Accessory (top)
+  if(acc && acc.id !== 'acc_none' && acc.id !== 'none'){
+    layers.push(`<img src="${ASSET_BASE}/accessories/${acc.file||acc.id+'.png'}" style="${imgStyle}" draggable="false" onerror="this.style.display='none'">`);
+  }
+
+  return `<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0">
+    ${layers.join('\n')}
+  </div>`;
 }
 
-let charTab = 'skin';
+// ── CHAR MODAL ────────────────────────────────────────────────
+let charTab  = 'skin';
 let charDraft = {};
 
-function openCharCustomizer(){
+async function openCharCustomizer(){
+  await loadManifest();
   charDraft = {...getCharConfig(ME)};
+  // Set defaults if nothing saved yet
+  if(!charDraft.skin    && CHAR_MANIFEST.skin?.[0])       charDraft.skin       = CHAR_MANIFEST.skin[0].id;
+  if(!charDraft.hairColor && CHAR_MANIFEST.hairColors?.[0]) charDraft.hairColor = CHAR_MANIFEST.hairColors[0].id;
+  if(!charDraft.hair    && CHAR_MANIFEST.hair?.[0])       charDraft.hair       = CHAR_MANIFEST.hair[0].id;
+  if(!charDraft.outfit  && CHAR_MANIFEST.outfits?.[0])    charDraft.outfit     = CHAR_MANIFEST.outfits[0].id;
   charTab = 'skin';
   renderCharModal();
   g('modal-char').classList.remove('hidden');
@@ -1354,73 +1335,127 @@ function openCharCustomizer(){
 
 function renderCharModal(){
   const body = g('char-body');
-  if(!body) return;
-  const coins = SS?.coins||0;
-  const claimed = SS?.claimed_rewards||[];
+  if(!body||!CHAR_MANIFEST) return;
+  const m = CHAR_MANIFEST;
 
   // Preview
   const preview = `<div style="display:flex;justify-content:center;margin-bottom:16px">
-    <div style="width:100px;height:100px;border-radius:50%;background:var(--rose-l);display:flex;align-items:center;justify-content:center;box-shadow:var(--sh)">
-      ${buildAvatarSVG(charDraft, 90)}
+    <div style="border-radius:50%;background:var(--rose-l);overflow:hidden;box-shadow:var(--sh)">
+      ${buildCharacterHTML(charDraft, 160)}
     </div>
   </div>`;
 
   // Tab bar
-  const tabs = ['skin','hair','hat','outfit','accessory'];
-  const tabIcons = {skin:'🎨',hair:'💇',hat:'🎩',outfit:'👕',accessory:'✨'};
-  const tabBar = `<div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px">
-    ${tabs.map(t=>`<button onclick="switchCharTab('${t}')" style="flex-shrink:0;padding:6px 12px;border-radius:var(--rpill);border:none;font-size:12px;font-weight:600;cursor:pointer;background:${charTab===t?'var(--rose)':'var(--bd)'};color:${charTab===t?'white':'var(--text2)'};transition:all .2s">${tabIcons[t]} ${t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')}
+  const tabs = [
+    {id:'skin',      icon:'🎨', label:'Skin'},
+    {id:'hairStyle', icon:'💇', label:'Hair'},
+    {id:'hairColor', icon:'🎨', label:'Colour'},
+    {id:'outfit',    icon:'👕', label:'Outfit'},
+    {id:'hat',       icon:'🎩', label:'Hat'},
+    {id:'accessory', icon:'✨', label:'Extra'},
+  ];
+  const tabBar = `<div style="display:flex;gap:5px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none">
+    ${tabs.map(t=>`<button onclick="switchCharTab('${t.id}')" style="flex-shrink:0;padding:6px 10px;border-radius:var(--rpill);border:none;font-size:11px;font-weight:600;cursor:pointer;background:${charTab===t.id?'var(--rose)':'var(--bd)'};color:${charTab===t.id?'white':'var(--text2)'};transition:all .2s">${t.icon} ${t.label}</button>`).join('')}
   </div>`;
 
-  // Items grid
   let grid = '';
+  const unlocked = ME?.avatar_config?.unlocked||[];
+
+  const itemBtn = (id, isSelected, cost, isUnlocked, content, extraStyle='') => {
+    const locked = cost > 0 && !isUnlocked;
+    const action = locked
+      ? `unlockCharItem('${id}',${cost})`
+      : `selectCharPart('${charTab}','${id}')`;
+    return `<button onclick="${action}" style="position:relative;border-radius:var(--rsm);border:${isSelected?'2.5px solid var(--rose)':'1.5px solid var(--bd2)'};background:${isSelected?'var(--rose-l)':'white'};cursor:pointer;overflow:hidden;${extraStyle}">
+      ${content}
+      ${locked?`<div style="position:absolute;bottom:3px;right:3px;font-size:9px;background:var(--amber);color:white;border-radius:4px;padding:1px 5px;font-weight:700">${cost}🪙</div>`:''}
+      ${isSelected?`<div style="position:absolute;top:3px;right:3px;width:14px;height:14px;border-radius:50%;background:var(--rose);display:flex;align-items:center;justify-content:center;font-size:8px;color:white">✓</div>`:''}
+    </button>`;
+  };
+
   if(charTab==='skin'){
-    grid = `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-      ${CHAR_PARTS.skin.map(s=>`
-        <button onclick="selectCharPart('skin','${s.id}')" style="width:52px;height:52px;border-radius:50%;background:${s.color};border:${charDraft.skin===s.id?'3px solid var(--rose)':'2px solid var(--bd2)'};cursor:pointer;box-shadow:${charDraft.skin===s.id?'0 0 0 2px white, 0 0 0 4px var(--rose)':'none'};transition:all .2s" title="${s.label}"></button>
-      `).join('')}
+    grid = `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:8px 0">
+      ${(m.skin||[]).map(s=>itemBtn(
+        s.id, charDraft.skin===s.id, 0, true,
+        `<div style="width:52px;height:52px;background:${s.color};border-radius:50%"></div>
+         <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center">${s.label}</div>`,
+        'padding:6px;display:flex;flex-direction:column;align-items:center;border-radius:12px'
+      )).join('')}
     </div>`;
-  } else if(charTab==='hair'){
-    grid = `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-      ${CHAR_PARTS.hair.map(h=>`
-        <button onclick="selectCharPart('hair','${h.id}')" style="width:52px;height:52px;border-radius:50%;background:${h.color};border:${charDraft.hair===h.id?'3px solid var(--rose)':'2px solid var(--bd2)'};cursor:pointer;box-shadow:${charDraft.hair===h.id?'0 0 0 2px white, 0 0 0 4px var(--rose)':'none'};transition:all .2s" title="${h.label}"></button>
-      `).join('')}
+
+  } else if(charTab==='hairStyle'){
+    if(!m.hair?.length){
+      grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No hairstyles in manifest yet.<br>Add PNG files and run the generator.</div>`;
+    } else {
+      grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${(m.hair||[]).map(h=>itemBtn(
+          h.id, charDraft.hair===h.id, h.coins||0, unlocked.includes(h.id)||(h.coins||0)===0,
+          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            <img src="${ASSET_BASE}/hair/${h.id}_front.png" style="width:100%;height:100%;object-fit:contain;filter:${hexToFilter('#6B3A2A')}" onerror="this.parentElement.innerHTML='💇'">
+          </div>
+          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${h.label}</div>`,
+          'padding:6px;display:flex;flex-direction:column'
+        )).join('')}
+      </div>`;
+    }
+
+  } else if(charTab==='hairColor'){
+    grid = `<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:8px 0">
+      ${(m.hairColors||[]).map(hc=>itemBtn(
+        hc.id, charDraft.hairColor===hc.id, hc.coins||0, unlocked.includes(hc.id)||(hc.coins||0)===0,
+        `<div style="width:52px;height:52px;border-radius:50%;background:${hc.color}"></div>
+         <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center">${hc.label}</div>`,
+        'padding:6px;display:flex;flex-direction:column;align-items:center;border-radius:12px'
+      )).join('')}
     </div>`;
-  } else if(charTab==='hat'){
-    grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      ${CHAR_PARTS.hat.map(h=>{
-        const locked = h.coins>0 && !(ME?.avatar_config?.unlocked_hats||[]).includes(h.id);
-        const sel = charDraft.hat===h.id;
-        return `<button onclick="${locked?`unlockCharItem('hat','${h.id}',${h.coins})`:`selectCharPart('hat','${h.id}')`}" style="padding:10px 6px;border-radius:var(--rsm);border:${sel?'2px solid var(--rose)':'1.5px solid var(--bd2)'};background:${sel?'var(--rose-l)':'white'};cursor:pointer;text-align:center;font-size:20px;position:relative">
-          ${h.emoji||'∅'}
-          <div style="font-size:9px;color:var(--text3);margin-top:3px">${h.label}</div>
-          ${locked?`<div style="position:absolute;top:4px;right:4px;font-size:9px;background:var(--amber-l);color:var(--amber);border-radius:4px;padding:1px 4px;font-weight:700">${h.coins}🪙</div>`:''}
-        </button>`;
-      }).join('')}
-    </div>`;
+
   } else if(charTab==='outfit'){
-    grid = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-      ${CHAR_PARTS.outfit.map(o=>{
-        const locked = o.coins>0 && !(ME?.avatar_config?.unlocked_outfits||[]).includes(o.id);
-        const sel = charDraft.outfit===o.id;
-        return `<button onclick="${locked?`unlockCharItem('outfit','${o.id}',${o.coins})`:`selectCharPart('outfit','${o.id}')`}" style="height:48px;border-radius:var(--rsm);border:${sel?'2px solid var(--rose)':'1.5px solid var(--bd2)'};background:${o.color};cursor:pointer;position:relative;opacity:${locked?.6:1}">
-          ${locked?`<div style="position:absolute;top:3px;right:3px;font-size:9px;background:rgba(0,0,0,.15);color:white;border-radius:4px;padding:1px 4px;font-weight:700">${o.coins}🪙</div>`:''}
-          ${sel?`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px">✓</div>`:''}
-        </button>`;
-      }).join('')}
-    </div>`;
+    if(!m.outfits?.length){
+      grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No outfits in manifest yet.</div>`;
+    } else {
+      grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${(m.outfits||[]).map(o=>itemBtn(
+          o.id, charDraft.outfit===o.id, o.coins||0, unlocked.includes(o.id)||(o.coins||0)===0,
+          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            <img src="${ASSET_BASE}/outfits/${o.file||o.id+'.png'}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='👕'">
+          </div>
+          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${o.label}</div>`,
+          'padding:6px;display:flex;flex-direction:column'
+        )).join('')}
+      </div>`;
+    }
+
+  } else if(charTab==='hat'){
+    if(!m.hats?.length){
+      grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No hats in manifest yet.</div>`;
+    } else {
+      grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${(m.hats||[]).map(h=>itemBtn(
+          h.id, charDraft.hat===h.id, h.coins||0, unlocked.includes(h.id)||(h.coins||0)===0,
+          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            <img src="${ASSET_BASE}/hats/${h.file||h.id+'.png'}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='🎩'">
+          </div>
+          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${h.label}</div>`,
+          'padding:6px;display:flex;flex-direction:column'
+        )).join('')}
+      </div>`;
+    }
+
   } else if(charTab==='accessory'){
-    grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      ${CHAR_PARTS.accessory.map(a=>{
-        const locked = a.coins>0 && !(ME?.avatar_config?.unlocked_accessories||[]).includes(a.id);
-        const sel = charDraft.accessory===a.id;
-        return `<button onclick="${locked?`unlockCharItem('accessory','${a.id}',${a.coins})`:`selectCharPart('accessory','${a.id}')`}" style="padding:10px 6px;border-radius:var(--rsm);border:${sel?'2px solid var(--rose)':'1.5px solid var(--bd2)'};background:${sel?'var(--rose-l)':'white'};cursor:pointer;text-align:center">
-          <div style="font-size:18px">${{glasses:'👓',shades:'🕶️',earrings:'💛',freckles:'🟤',blush:'🌸','':'✕'}[a.svg]||'✕'}</div>
-          <div style="font-size:9px;color:var(--text3);margin-top:3px">${a.label}</div>
-          ${locked?`<div style="font-size:9px;background:var(--amber-l);color:var(--amber);border-radius:4px;padding:1px 4px;font-weight:700;display:inline-block;margin-top:2px">${a.coins}🪙</div>`:''}
-        </button>`;
-      }).join('')}
-    </div>`;
+    if(!m.accessories?.length){
+      grid = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">No accessories in manifest yet.</div>`;
+    } else {
+      grid = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${(m.accessories||[]).map(a=>itemBtn(
+          a.id, charDraft.accessory===a.id, a.coins||0, unlocked.includes(a.id)||(a.coins||0)===0,
+          `<div style="width:100%;aspect-ratio:1;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            <img src="${ASSET_BASE}/accessories/${a.file||a.id+'.png'}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='✨'">
+          </div>
+          <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center;padding:0 2px">${a.label}</div>`,
+          'padding:6px;display:flex;flex-direction:column'
+        )).join('')}
+      </div>`;
+    }
   }
 
   body.innerHTML = preview + tabBar + `<div style="padding:4px 0 8px">${grid}</div>`;
@@ -1431,25 +1466,32 @@ function switchCharTab(tab){
   renderCharModal();
 }
 
-function selectCharPart(type, id){
-  charDraft[type] = id;
+function selectCharPart(tab, id){
+  // map tab id back to config key
+  const keyMap = {skin:'skin',hairStyle:'hair',hairColor:'hairColor',outfit:'outfit',hat:'hat',accessory:'accessory'};
+  charDraft[keyMap[tab]||tab] = id;
   renderCharModal();
 }
 
-async function unlockCharItem(type, id, cost){
-  if((SS?.coins||0) < cost){ toast(`Need ${cost} 🪙 to unlock this`); return; }
+async function unlockCharItem(id, cost){
+  if((SS?.coins||0) < cost){ toast(`Need ${cost} 🪙 to unlock`); return; }
   const config = getCharConfig(ME);
-  const key = type==='hat'?'unlocked_hats':type==='outfit'?'unlocked_outfits':'unlocked_accessories';
-  const unlocked = [...(config[key]||[])];
-  if(unlocked.includes(id)){ selectCharPart(type,id); return; }
-  unlocked.push(id);
-  config[key] = unlocked;
+  const unlocked = [...(config.unlocked||[])];
+  if(!unlocked.includes(id)) unlocked.push(id);
+  config.unlocked = unlocked;
   const {error} = await db.from('profiles').update({avatar_config:config}).eq('id',ME.id);
   if(error){ toast('Error unlocking'); return; }
   ME.avatar_config = config;
   await earnCoins(-cost);
   toast('Unlocked! 🎉');
-  selectCharPart(type, id);
+  // Now select it
+  // Find which category this id belongs to
+  const m = CHAR_MANIFEST;
+  if(m.hair?.find(x=>x.id===id))        selectCharPart('hairStyle', id);
+  else if(m.hairColors?.find(x=>x.id===id)) selectCharPart('hairColor', id);
+  else if(m.outfits?.find(x=>x.id===id)) selectCharPart('outfit', id);
+  else if(m.hats?.find(x=>x.id===id))    selectCharPart('hat', id);
+  else if(m.accessories?.find(x=>x.id===id)) selectCharPart('accessory', id);
 }
 
 async function saveCharacter(){
@@ -1463,12 +1505,15 @@ async function saveCharacter(){
   toast('Character saved! ✨');
 }
 
-// Build a small inline avatar for the home screen
 function renderHomeAvatars(){
-  const meEl = g('home-avatar-me');
-  const pEl  = g('home-avatar-partner');
-  if(meEl) meEl.innerHTML = buildAvatarSVG(getCharConfig(ME), 44);
-  if(pEl && PARTNER) pEl.innerHTML = buildAvatarSVG(getCharConfig(PARTNER), 44);
+  const meEl = g('hav-me');
+  const pEl  = g('hav-p');
+  if(meEl) meEl.innerHTML = CHAR_MANIFEST
+    ? buildCharacterHTML(getCharConfig(ME), 44)
+    : `<span style="font-size:32px">${ME?.avatar||'🐻'}</span>`;
+  if(pEl && PARTNER) pEl.innerHTML = CHAR_MANIFEST
+    ? buildCharacterHTML(getCharConfig(PARTNER), 44)
+    : `<span style="font-size:32px">${PARTNER?.avatar||'🐱'}</span>`;
 }
 
 // ── NEST ACTIVITY (interactive home card) ─────────────────
