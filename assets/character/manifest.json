@@ -1,0 +1,106 @@
+{
+  "skin": [
+    {
+      "id": "s1",
+      "label": "Light",
+      "color": "#FDDBB4"
+    },
+    {
+      "id": "s2",
+      "label": "Warm",
+      "color": "#F5C18A"
+    },
+    {
+      "id": "s3",
+      "label": "Golden",
+      "color": "#E8A96A"
+    },
+    {
+      "id": "s4",
+      "label": "Brown",
+      "color": "#C68642"
+    },
+    {
+      "id": "s5",
+      "label": "Deep",
+      "color": "#8D5524"
+    }
+  ],
+  "hairColors": [
+    {
+      "id": "hc1",
+      "label": "Black",
+      "color": "#1A1A1A",
+      "coins": 0
+    },
+    {
+      "id": "hc2",
+      "label": "Brown",
+      "color": "#6B3A2A",
+      "coins": 0
+    },
+    {
+      "id": "hc3",
+      "label": "Blonde",
+      "color": "#C8A882",
+      "coins": 20
+    },
+    {
+      "id": "hc4",
+      "label": "Auburn",
+      "color": "#A0522D",
+      "coins": 20
+    },
+    {
+      "id": "hc5",
+      "label": "Lavender",
+      "color": "#8B7BA8",
+      "coins": 40
+    },
+    {
+      "id": "hc6",
+      "label": "Rose",
+      "color": "#E87878",
+      "coins": 40
+    },
+    {
+      "id": "hc7",
+      "label": "Blue",
+      "color": "#78B4E8",
+      "coins": 40
+    }
+  ],
+  "hair": [
+    {
+      "id": "h_shortbob",
+      "label": "Shortbob",
+      "coins": 0,
+      "front": "hair/h_shortbob_front.png",
+      "back": "hair/h_shortbob_back.png"
+    }
+  ],
+  "outfits": [
+    {
+      "id": "out_hoodie",
+      "label": "Hoodie",
+      "coins": 30,
+      "file": "outfits/out_hoodie_30.png"
+    }
+  ],
+  "hats": [
+    {
+      "id": "hat_partyhat",
+      "label": "Partyhat",
+      "coins": 40,
+      "file": "hats/hat_partyhat_40.png"
+    }
+  ],
+  "accessories": [
+    {
+      "id": "acc_glasses",
+      "label": "Glasses",
+      "coins": 20,
+      "file": "accessories/acc_glasses_20.png"
+    }
+  ]
+}
