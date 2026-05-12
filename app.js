@@ -315,6 +315,7 @@ function subscribeRT(){
         }
       }
       renderNestRooms();
+      renderPetReaction();
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes',filter:`couple_id=eq.${COUPLE.id}`},p=>{
       if(p.new.user_id!==ME.id){NOTES.push(p.new);renderNotes();}
@@ -476,6 +477,7 @@ async function initUI(){
   safe(()=>renderDailyQuestion(),'renderDailyQuestion');
   safe(()=>renderNest(),       'renderNest');
   safe(()=>renderNestRooms(),  'renderNestRooms');
+  safe(()=>renderPetReaction(),'renderPetReaction');
   safe(()=>renderNotes(),      'renderNotes');
   safe(()=>renderDates(),      'renderDates');
   safe(()=>renderNestActivity(),'renderNestActivity');
@@ -627,7 +629,7 @@ async function saveMood(){
   g('mood-note').value='';moodE=null;moodL=null;
   document.querySelectorAll('.mood-opt').forEach(e=>e.classList.remove('on'));
   g('mood-coin-note').textContent='';
-  renderMood();renderHome();updateBar();
+  renderMood();renderHome();updateBar();renderPetReaction();
 }
 async function renderMood(){
   if(!COUPLE) return;
@@ -825,6 +827,118 @@ function renderNest(){
   const waterBtn=g('water-btn');if(waterBtn){waterBtn.disabled=wat;waterBtn.style.opacity=wat?.5:1;}
   se('plant-watered-badge',wat?'You watered Sprout 💧':(pWat?(PARTNER?.name||'Partner')+' watered Sprout 💧':''));
   se('plant-lim',wat?'You already watered Sprout today':(pWat?'You can still water Sprout today!':'Both of you can water once per day'));
+  renderPetReaction();
+}
+
+// ── PET REACTIONS ─────────────────────────────────────────────
+function renderPetReaction(){
+  const bubble = g('pet-mood-bubble');
+  const bar    = g('pet-reaction-bar');
+  const petEl  = g('pet-art');
+  if(!bubble||!bar||!SS) return;
+
+  const pl  = SS.pet_love   || 60;
+  const ph  = SS.pet_happy  || 75;
+  const phl = SS.pet_health || 50;
+  const avg = (pl + ph + phl) / 3;
+  const streak = SS.streak || 0;
+
+  // Days since last fed
+  const iU1 = COUPLE?.user1_id === ME?.id;
+  const myFed = SS[iU1?'pet_fed_user1':'pet_fed_user2']||'';
+  const pFed  = SS[iU1?'pet_fed_user2':'pet_fed_user1']||'';
+  const fedToday  = myFed === TODAY();
+  const bothFed   = fedToday && pFed === TODAY();
+  const neitherFed= myFed !== TODAY() && pFed !== TODAY();
+
+  // Current moods
+  const myMoodCat  = MY_MOOD  ? MOOD_CATEGORY(MY_MOOD.emoji)  : null;
+  const pMoodCat   = P_MOOD   ? MOOD_CATEGORY(P_MOOD.emoji)   : null;
+  const bothHappy  = myMoodCat==='Happy'  && pMoodCat==='Happy';
+  const anyStressed= myMoodCat==='Stressed'||pMoodCat==='Stressed'||myMoodCat==='Anxious'||pMoodCat==='Anxious';
+  const anySad     = myMoodCat==='Sad'    || pMoodCat==='Sad';
+
+  // Determine reaction state — priority order
+  let state, msg, animation;
+
+  if(avg >= 85 && bothFed && streak >= 7){
+    state='thriving';
+    msg='I\'m SO happy right now! 🌟';
+    animation='bounce';
+  } else if(bothHappy && avg >= 70){
+    state='joyful';
+    msg='You two are radiating good vibes! 😄';
+    animation='wiggle';
+  } else if(avg >= 70 && fedToday){
+    state='happy';
+    msg='Feeling loved and well-fed 💛';
+    animation='wiggle';
+  } else if(neitherFed && avg < 60){
+    state='sad';
+    msg='I\'m hungry and a little sad... 🥺';
+    animation='droop';
+  } else if(anySad){
+    state='worried';
+    msg='Someone seems sad... I\'m here too 🥺';
+    animation='droop';
+  } else if(anyStressed){
+    state='uneasy';
+    msg='Feeling a bit tense in here... 😟';
+    animation='shake';
+  } else if(neitherFed){
+    state='hungry';
+    msg='Has anyone seen my food? 👀';
+    animation='shake';
+  } else if(avg < 50){
+    state='low';
+    msg='Could use some extra love today...';
+    animation='droop';
+  } else if(streak >= 30){
+    state='proud';
+    msg=`${streak} day streak?! You two are my heroes 👑`;
+    animation='bounce';
+  } else if(streak >= 7){
+    state='excited';
+    msg=`${streak} days in a row! Keep going! 🔥`;
+    animation='wiggle';
+  } else if(P_MOOD && !MY_MOOD){
+    state='curious';
+    msg='Your partner shared their mood... what about you? 🤔';
+    animation='';
+  } else {
+    state='content';
+    msg='Just chilling with you two 🌿';
+    animation='';
+  }
+
+  // Status bar label
+  const STATUS_LABEL={
+    thriving:'✨ Thriving', joyful:'😄 Joyful', happy:'💛 Happy',
+    excited:'🔥 Excited', proud:'👑 Proud', content:'😌 Content',
+    curious:'🤔 Curious', uneasy:'😟 Uneasy', worried:'🥺 Worried',
+    hungry:'👀 Hungry', sad:'😢 Sad', low:'💤 Low energy',
+  };
+  bar.textContent = STATUS_LABEL[state] || '';
+
+  // Speech bubble
+  bubble.textContent = msg;
+  bubble.style.display = 'block';
+
+  // Animation
+  if(petEl){
+    petEl.classList.remove('pet-bounce','pet-wiggle','pet-droop','pet-shake');
+    if(animation) petEl.classList.add('pet-'+animation);
+  }
+}
+
+function MOOD_CATEGORY(emoji){
+  const map={
+    '😄':'Happy','😊':'Happy','🥰':'Happy','🥳':'Happy',
+    '😌':'Peaceful','😴':'Tired','🤩':'Excited','😎':'Excited',
+    '😐':'Meh','🤔':'Reflective','😰':'Anxious','😤':'Stressed',
+    '😔':'Sad','😢':'Sad','😡':'Frustrated','🤒':'Unwell',
+  };
+  return map[emoji]||'Meh';
 }
 
 // CITY buy

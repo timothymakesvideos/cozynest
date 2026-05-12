@@ -329,3 +329,15 @@ body{font-family:'Nunito',sans-serif;color:var(--text);overscroll-behavior:none}
 /* ── STREAK REWARD ── */
 @keyframes streakPop{0%{transform:scale(0) rotate(-15deg);opacity:0}70%{transform:scale(1.15) rotate(5deg)}100%{transform:scale(1) rotate(0deg);opacity:1}}
 #streak-progress-card:empty{display:none}
+
+/* ── PET REACTIONS ── */
+@keyframes petBounce{0%,100%{transform:translateY(0)}25%{transform:translateY(-14px)}50%{transform:translateY(-6px)}75%{transform:translateY(-10px)}}
+@keyframes petWiggle{0%,100%{transform:rotate(0deg)}20%{transform:rotate(-10deg)}40%{transform:rotate(10deg)}60%{transform:rotate(-7deg)}80%{transform:rotate(7deg)}}
+@keyframes petDroop{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(5px) scale(0.93)}}
+@keyframes petShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.pet-bounce{animation:petBounce .7s ease infinite}
+.pet-wiggle{animation:petWiggle .6s ease 3}
+.pet-droop{animation:petDroop 1.4s ease infinite}
+.pet-shake{animation:petShake .5s ease 2}
+#pet-mood-bubble{animation:fadeIn .3s ease both}
+@keyframes fadeIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
