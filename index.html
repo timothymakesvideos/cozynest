@@ -225,7 +225,18 @@
       <input class="ob-inp" id="settings-name-inp" placeholder="Your name" maxlength="20" style="flex:1">
       <button class="btn-save" style="width:auto;padding:11px 16px;margin-top:0" onclick="saveName()">Save</button>
     </div>
-    <button class="btn-save" style="background:var(--teal)" onclick="openCharCustomizer()">✨ Customize your character</button>
+    <div class="ob-lbl">Profile emoji <span style="font-size:10px;color:var(--text3)">(shown when not using custom character)</span></div>
+    <div class="ob-emrow" id="settings-av-row">
+      <button class="ob-em" data-e="🐻" onclick="saveAvatar(this)">🐻</button>
+      <button class="ob-em" data-e="🐱" onclick="saveAvatar(this)">🐱</button>
+      <button class="ob-em" data-e="🐰" onclick="saveAvatar(this)">🐰</button>
+      <button class="ob-em" data-e="🦊" onclick="saveAvatar(this)">🦊</button>
+      <button class="ob-em" data-e="🐸" onclick="saveAvatar(this)">🐸</button>
+      <button class="ob-em" data-e="🐼" onclick="saveAvatar(this)">🐼</button>
+      <button class="ob-em" data-e="🦋" onclick="saveAvatar(this)">🦋</button>
+      <button class="ob-em" data-e="🌸" onclick="saveAvatar(this)">🌸</button>
+    </div>
+    <button class="btn-save" style="background:var(--teal);margin-top:12px" onclick="openCharCustomizer()">✨ Customize your character</button>
   </div>
 
   <!-- Couple / Invite Code -->

@@ -502,8 +502,8 @@ function updateGreeting(){
 // HOME
 function renderHome(){
   const meAvEl=g('hav-me');const pAvEl=g('hav-p');
-  if(meAvEl) meAvEl.innerHTML=buildCharacterHTML(getCharConfig(ME),44);
-  if(pAvEl)  pAvEl.innerHTML=PARTNER?buildCharacterHTML(getCharConfig(PARTNER),44):`<div style="width:44px;height:44px;border-radius:50%;background:var(--teal-l);display:flex;align-items:center;justify-content:center;font-size:24px">🐱</div>`;
+  if(meAvEl) meAvEl.innerHTML=buildAvatarDisplay(ME,44);
+  if(pAvEl)  pAvEl.innerHTML=PARTNER?buildAvatarDisplay(PARTNER,44):`<div style="width:44px;height:44px;border-radius:50%;background:var(--teal-l);display:flex;align-items:center;justify-content:center;font-size:24px">🐱</div>`;
   if(g('hn-me')) g('hn-me').textContent=ME?.name||'You';
   if(g('hn-p'))  g('hn-p').textContent=PARTNER?.name||'Partner';
   g('hm-me').textContent=MY_MOOD?.emoji||'—';g('hnote-me').textContent=MY_MOOD?.note||MY_MOOD?.label||'No mood yet';
@@ -1137,10 +1137,15 @@ function renderSettings(){
   if(!ME) return;
   // SVG character preview
   const avEl = g('settings-avatar');
-  if(avEl) avEl.innerHTML = buildCharacterHTML(getCharConfig(ME), 52);
+  if(avEl) avEl.innerHTML = buildAvatarDisplay(ME, 52);
   g('settings-name').textContent = ME?.name||'You';
   g('settings-email').textContent = ME?.email||(db.auth.getUser().then(r=>r.data?.user?.email||''));
   g('settings-name-inp').value = ME?.name||'';
+  // Highlight current emoji
+  const avRow = g('settings-av-row');
+  if(avRow) avRow.querySelectorAll('.ob-em').forEach(b=>{
+    b.classList.toggle('on', b.dataset.e===(ME?.avatar||'🐻'));
+  });
 
   // Couple block
   const block = g('settings-couple-block');
@@ -1282,6 +1287,19 @@ function getCharConfig(profile){
   catch(e){ return {}; }
 }
 
+// Returns either the layered character or an emoji avatar depending on user preference
+function buildAvatarDisplay(profile, size=44){
+  const config = getCharConfig(profile);
+  const emoji  = profile?.avatar || (profile?.id === ME?.id ? '🐻' : '🐱');
+  const bg     = profile?.id === ME?.id ? 'var(--rose-l)' : 'var(--teal-l)';
+
+  if(config.use_character && CHAR_MANIFEST){
+    return buildCharacterHTML(config, size);
+  }
+  // Fallback: emoji avatar circle
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;font-size:${Math.round(size*0.55)}px;flex-shrink:0">${emoji}</div>`;
+}
+
 // Build layered character HTML — stacked absolute PNGs
 function buildCharacterHTML(config, size=200){
   if(!CHAR_MANIFEST) return `<div style="width:${size}px;height:${size}px;background:var(--rose-l);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${size*.4}px">🐣</div>`;
@@ -1373,10 +1391,21 @@ function renderCharModal(){
   if(!body||!CHAR_MANIFEST) return;
   const m = CHAR_MANIFEST;
 
-  // Preview
-  const preview = `<div style="display:flex;justify-content:center;margin-bottom:16px">
+  const useChar = charDraft.use_character || false;
+
+  // Preview — show character or emoji based on toggle
+  const preview = `<div style="display:flex;justify-content:center;margin-bottom:12px">
     <div style="border-radius:50%;background:var(--rose-l);overflow:hidden;box-shadow:var(--sh)">
-      ${buildCharacterHTML(charDraft, 160)}
+      ${useChar ? buildCharacterHTML(charDraft, 160) : buildAvatarDisplay(ME, 160)}
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bd);border-radius:var(--rsm);margin-bottom:14px">
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--text)">Use custom character</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:1px">Show character instead of emoji on home screen</div>
+    </div>
+    <div onclick="toggleUseCharacter()" style="width:44px;height:26px;border-radius:13px;background:${useChar?'var(--rose)':'var(--bd2)'};cursor:pointer;position:relative;transition:background .2s;flex-shrink:0">
+      <div style="position:absolute;top:3px;left:${useChar?'21':'3'}px;width:20px;height:20px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .2s"></div>
     </div>
   </div>`;
 
@@ -1514,9 +1543,13 @@ function switchCharTab(tab){
 }
 
 function selectCharPart(tab, id){
-  // map tab id back to config key
   const keyMap = {skin:'skin',hairStyle:'hair',hairColor:'hairColor',outfit:'outfit',hat:'hat',accessory:'accessory'};
   charDraft[keyMap[tab]||tab] = id;
+  renderCharModal();
+}
+
+function toggleUseCharacter(){
+  charDraft.use_character = !charDraft.use_character;
   renderCharModal();
 }
 
@@ -1555,12 +1588,8 @@ async function saveCharacter(){
 function renderHomeAvatars(){
   const meEl = g('hav-me');
   const pEl  = g('hav-p');
-  if(meEl) meEl.innerHTML = CHAR_MANIFEST
-    ? buildCharacterHTML(getCharConfig(ME), 44)
-    : `<span style="font-size:32px">${ME?.avatar||'🐻'}</span>`;
-  if(pEl && PARTNER) pEl.innerHTML = CHAR_MANIFEST
-    ? buildCharacterHTML(getCharConfig(PARTNER), 44)
-    : `<span style="font-size:32px">${PARTNER?.avatar||'🐱'}</span>`;
+  if(meEl) meEl.innerHTML = buildAvatarDisplay(ME, 44);
+  if(pEl && PARTNER) pEl.innerHTML = buildAvatarDisplay(PARTNER, 44);
 }
 
 // ── NEST ACTIVITY (interactive home card) ─────────────────
