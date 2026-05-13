@@ -194,6 +194,7 @@ async function boot(){
     console.log('boot: profile', profile?.id, profErr?.message);
     if(profErr||!profile){ loading(false); showAuth('login'); return; }
     ME = profile;
+    ME.email = user.email||'';
 
     // Step 3: No couple yet
     if(!ME.couple_id){ loading(false); showCouple(); return; }
@@ -1139,7 +1140,7 @@ function renderSettings(){
   const avEl = g('settings-avatar');
   if(avEl) avEl.innerHTML = buildAvatarDisplay(ME, 52);
   g('settings-name').textContent = ME?.name||'You';
-  g('settings-email').textContent = ME?.email||(db.auth.getUser().then(r=>r.data?.user?.email||''));
+  g('settings-email').textContent = ME?.email||'';
   g('settings-name-inp').value = ME?.name||'';
   // Highlight current emoji
   const avRow = g('settings-av-row');
@@ -1534,7 +1535,12 @@ function renderCharModal(){
     }
   }
 
-  body.innerHTML = preview + tabBar + `<div style="padding:4px 0 8px">${grid}</div>`;
+  // Only show customization options when custom character is enabled
+  if(useChar){
+    body.innerHTML = preview + tabBar + `<div style="padding:4px 0 8px">${grid}</div>`;
+  } else {
+    body.innerHTML = preview;
+  }
 }
 
 function switchCharTab(tab){
