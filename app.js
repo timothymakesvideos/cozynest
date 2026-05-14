@@ -300,51 +300,52 @@ setTimeout(()=>{
 
 // ── REALTIME ─────────────────────────────────────────────────
 function subscribeRT(){
-  if(REALTIME_CH)sb.removeChannel(REALTIME_CH);
+  if(REALTIME_CH) sb.removeChannel(REALTIME_CH);
   REALTIME_CH=db.channel('cn-'+COUPLE.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'moods',filter:`couple_id=eq.${COUPLE.id}`},p=>{
-      if(p.new.user_id!==ME.id){P_MOOD=p.new;renderMood();renderHome();toast((PARTNER?.name||'Partner')+' updated their mood 💭');}
+      if(p.new.user_id!==ME.id){
+        P_MOOD=p.new;
+        scheduleRender(renderMood, renderHome, ()=>toast((PARTNER?.name||'Partner')+' updated their mood 💭'));
+      }
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'shared_state',filter:`couple_id=eq.${COUPLE.id}`},p=>{
-      SS=p.new;renderNest();updateBar();
-      // If sequence modal is open, refresh it
-      const modal = document.getElementById('modal-sequence');
-      if(modal && !modal.classList.contains('hidden')){
-        const seqId = modal.dataset.seqid;
+      SS=p.new;
+      scheduleRender(renderNest, renderNestRooms, renderPetReaction, updateBar, renderStreakProgress);
+      const modal=document.getElementById('modal-sequence');
+      if(modal&&!modal.classList.contains('hidden')){
+        const seqId=modal.dataset.seqid;
         if(seqId){
-          const roomKey = Object.keys(ACTIVITY_SEQUENCES).find(k=>ACTIVITY_SEQUENCES[k].id===seqId);
-          if(roomKey) renderSequenceModal(ACTIVITY_SEQUENCES[roomKey]);
+          const roomKey=Object.keys(ACTIVITY_SEQUENCES).find(k=>ACTIVITY_SEQUENCES[k].id===seqId);
+          if(roomKey) scheduleRender(()=>renderSequenceModal(ACTIVITY_SEQUENCES[roomKey]));
         }
       }
-      renderNestRooms();
-      renderPetReaction();
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'notes',filter:`couple_id=eq.${COUPLE.id}`},p=>{
-      if(p.new.user_id!==ME.id){NOTES.push(p.new);renderNotes();}
+      if(p.new.user_id!==ME.id){ NOTES.push(p.new); scheduleRender(renderNotes); }
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'notes',filter:`couple_id=eq.${COUPLE.id}`},p=>{
+      // Reaction update on a note
+      const idx=NOTES.findIndex(n=>n.id===p.new.id);
+      if(idx>=0) NOTES[idx]=p.new;
+      scheduleRender(renderNotes);
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'couples',filter:`id=eq.${COUPLE.id}`},async p=>{
       COUPLE=p.new;
-      // If partner just joined, load their profile
       if(!PARTNER){
         const pid=COUPLE.user1_id===ME.id?COUPLE.user2_id:COUPLE.user1_id;
         if(pid){
           const{data:partner}=await db.from('profiles').select('*').eq('id',pid).single();
           PARTNER=partner||null;
-          renderHome();renderMood();renderDailyQuestion();
+          scheduleRender(renderHome, renderMood, renderDailyQuestion, renderSettings);
           toast((PARTNER?.name||'Your partner')+' joined the nest! 💛');
         }
       }
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'daily_question_answers',filter:`couple_id=eq.${COUPLE.id}`},p=>{
-      if(p.new.user_id!==ME.id){PARTNER_Q_ANSWER=p.new;renderDailyQuestion();toast((PARTNER?.name||'Partner')+' answered today\'s question 💬');}
-    })
-    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'couples',filter:`id=eq.${COUPLE.id}`},async p=>{
-      // Partner just joined — load their profile
-      COUPLE=p.new;
-      const pid=COUPLE.user1_id===ME.id?COUPLE.user2_id:COUPLE.user1_id;
-      if(pid&&!PARTNER){
-        const {data:partner}=await db.from('profiles').select('*').eq('id',pid).single();
-        PARTNER=partner;renderHome();renderMood();renderSettings();toast((PARTNER?.name||'Partner')+' joined your nest! 💛');
+      if(p.new.user_id!==ME.id){
+        PARTNER_Q_ANSWER=p.new;
+        scheduleRender(renderDailyQuestion);
+        toast((PARTNER?.name||'Partner')+' answered today\'s question 💬');
       }
     })
     .subscribe();
@@ -355,6 +356,28 @@ async function updateSS(patch){
   Object.assign(SS,patch);
   await db.from('shared_state').update({...patch,updated_at:new Date().toISOString()}).eq('couple_id',COUPLE.id);
 }
+
+// ── RENDER BATCHING ───────────────────────────────────────────
+// Instead of calling render functions directly, schedule them.
+// Multiple calls within the same frame collapse into one render.
+let _renderPending = false;
+let _renderQueue   = new Set();
+
+function scheduleRender(...fns){
+  fns.forEach(f => _renderQueue.add(f));
+  if(_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(()=>{
+    _renderPending = false;
+    const queue = [..._renderQueue];
+    _renderQueue.clear();
+    queue.forEach(f => { try{ f(); } catch(e){ console.warn('render error:',e); } });
+  });
+}
+
+// Grouped render helpers — call these instead of individual renders
+function renderNestAll(){ scheduleRender(renderNest, renderNestRooms, renderPetReaction, updateBar); }
+function renderHomeAll(){ scheduleRender(renderHome, updateBar, renderStreakProgress); }
 // ── STREAK REWARDS ───────────────────────────────────────────
 const STREAK_REWARDS = [
   { days:7,   coins:50,  icon:'🌟', title:'One week together!',    desc:'You\'ve shown up for each other every day this week. Here\'s 50 bonus coins — spend them on your nest.',  decor:null },
@@ -467,7 +490,17 @@ function renderStreakProgress(){
 }
 
 
-async function earnCoins(n){await updateSS({coins:(SS.coins||0)+n});updateBar();coinPop(n);}
+let _coinsLocked = false;
+async function earnCoins(n){
+  if(_coinsLocked) return;
+  _coinsLocked = true;
+  try{
+    const newTotal = Math.max(0,(SS.coins||0)+n); // never go below 0
+    await updateSS({coins:newTotal});
+    scheduleRender(updateBar);
+    if(n>0) coinPop(n);
+  } finally { _coinsLocked = false; }
+}
 
 // ── UI ───────────────────────────────────────────────────────
 async function initUI(){
@@ -582,16 +615,16 @@ async function doAct(id,coins){
   await tryStreak();await earnCoins(coins);
   toast('✓ '+act.name+' complete!');
   await updPet(5,5,3);await updPlant(4);
-  renderHome();updateBar();
+  scheduleRender(renderHome, updateBar);
 }
 
 async function unDoAct(id){
-  // Remove from DB
   const{error}=await db.from('activities').delete()
     .eq('couple_id',COUPLE.id).eq('user_id',ME.id).eq('act_id',id).eq('act_date',TODAY());
   if(error){toast('Error unchecking');return;}
   ACT_DONE_TODAY=ACT_DONE_TODAY.filter(x=>x!==id);
-  renderHome();toast('Activity unchecked');
+  scheduleRender(renderHome);
+  toast('Activity unchecked');
 }
 
 // CUSTOM ACT
@@ -635,7 +668,7 @@ async function saveMood(){
   g('mood-note').value='';moodE=null;moodL=null;
   document.querySelectorAll('.mood-opt').forEach(e=>e.classList.remove('on'));
   g('mood-coin-note').textContent='';
-  renderMood();renderHome();updateBar();renderPetReaction();
+  renderMood();scheduleRender(renderHome, updateBar, renderPetReaction);
 }
 async function renderMood(){
   if(!COUPLE) return;
@@ -798,12 +831,14 @@ async function updPlant(v){await updateSS({plant_progress:Math.min(100,(SS.plant
 async function feedPet(){
   const field=COUPLE.user1_id===ME.id?'pet_fed_user1':'pet_fed_user2';
   if((SS[field]||'')===TODAY()){toast('You already fed Pebble today! Come back tomorrow 🌙');return;}
-  await updateSS({[field]:TODAY()});await updPet(10,12,8);await tryStreak();await earnCoins(3);toast('Pebble loved that! 🌟');renderNest();
+  await updateSS({[field]:TODAY()});await updPet(10,12,8);await tryStreak();await earnCoins(3);
+  toast('Pebble loved that! 🌟');scheduleRender(renderNest,renderPetReaction);
 }
 async function waterPlant(){
   const field=COUPLE.user1_id===ME.id?'plant_wat_user1':'plant_wat_user2';
   if((SS[field]||'')===TODAY()){toast('You already watered Sprout today! Come back tomorrow 💧');return;}
-  await updateSS({[field]:TODAY()});await updPlant(10);await tryStreak();await earnCoins(3);toast('Sprout is growing! 🌱');renderNest();
+  await updateSS({[field]:TODAY()});await updPlant(10);await tryStreak();await earnCoins(3);
+  toast('Sprout is growing! 🌱');scheduleRender(renderNest,renderPetReaction);
 }
 function renderNest(){
   if(!SS)return;
@@ -966,11 +1001,50 @@ async function buyLoc(id){
 }
 
 // NOTES
+const NOTE_REACTIONS=['❤️','😂','🥺','😮','🔥','👏'];
+
+function renderReactionBar(note,mine){
+  const reactions=note.reactions||{};
+  const myReaction=reactions[ME.id];
+  const counts={};
+  Object.values(reactions).forEach(e=>{counts[e]=(counts[e]||0)+1;});
+  const pills=Object.entries(counts).map(([e,c])=>
+    `<span onclick="reactToNote('${note.id}','${e}')" style="cursor:pointer;padding:2px 7px;border-radius:var(--rpill);background:${myReaction===e?'var(--rose-l)':'rgba(0,0,0,.06)'};border:1px solid ${myReaction===e?'var(--rose)':'transparent'};font-size:12px;display:inline-flex;align-items:center;gap:3px">${e}<span style="font-size:10px;opacity:.7">${c>1?c:''}</span></span>`
+  ).join('');
+  return`<div style="display:flex;gap:4px;margin-top:5px;flex-wrap:wrap;align-items:center">
+    ${pills}
+    <span onclick="toggleReactionPicker('${note.id}')" style="cursor:pointer;padding:2px 8px;border-radius:var(--rpill);background:rgba(0,0,0,.06);font-size:11px;color:var(--text3)">＋</span>
+    <div id="rpick-${note.id}" style="display:none;gap:4px;flex-wrap:wrap;margin-top:2px">
+      ${NOTE_REACTIONS.map(e=>`<span onclick="reactToNote('${note.id}','${e}')" style="cursor:pointer;font-size:18px;padding:3px 5px;border-radius:8px;background:rgba(0,0,0,.06)">${e}</span>`).join('')}
+    </div>
+  </div>`;
+}
+
+function toggleReactionPicker(noteId){
+  const p=g('rpick-'+noteId);if(p) p.style.display=p.style.display==='none'?'flex':'none';
+}
+
+async function reactToNote(noteId,emoji){
+  const note=NOTES.find(n=>n.id===noteId);if(!note)return;
+  const reactions={...(note.reactions||{})};
+  if(reactions[ME.id]===emoji) delete reactions[ME.id];
+  else reactions[ME.id]=emoji;
+  note.reactions=reactions;
+  scheduleRender(renderNotes);
+  const{error}=await db.from('notes').update({reactions}).eq('id',noteId);
+  if(error){toast('Error saving reaction');return;}
+  if(note.user_id!==ME.id&&reactions[ME.id])
+    sendPushNotification('note',(ME?.name||'You')+' reacted '+emoji+' to your note');
+}
+
 function renderNotes(){
-  const el=g('notes-list'); if(!el) return;
+  const el=g('notes-list');if(!el)return;
   el.innerHTML=NOTES.map(n=>{
     const mine=n.user_id===ME.id;
-    if(n.sticker)return`<div class="nbub sticker ${mine?'me':'p'}" onclick="${mine?`deleteNote('${n.id}')`:''}">${n.sticker}</div>`;
+    if(n.sticker)return`<div class="nbub sticker ${mine?'me':'p'}" onclick="${mine?`deleteNote('${n.id}')`:''}">
+      ${n.sticker}
+      ${renderReactionBar(n,mine)}
+    </div>`;
     const t=new Date(n.created_at).toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'});
     return`<div class="nbub ${mine?'me':'p'}">
       <div class="nt">${n.text}</div>
@@ -978,6 +1052,7 @@ function renderNotes(){
         <div class="ntm">${t}</div>
         ${mine?`<div class="ntm" style="cursor:pointer;opacity:.5" onclick="deleteNote('${n.id}')">✕</div>`:''}
       </div>
+      ${renderReactionBar(n,mine)}
     </div>`;
   }).join('');
   setTimeout(()=>{const s=g('notes-scroll');if(s)s.scrollTop=s.scrollHeight;},60);
